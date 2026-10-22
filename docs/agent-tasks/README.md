@@ -6,7 +6,7 @@ One brief per task. One task = one branch = one PR. Only the owner merges.
 
 | ID | Title | Depends on | Approval | Status |
 |---|---|---|---|---|
-| T-001 | Repository hygiene files | — | not-required | todo |
+| T-001 | Repository hygiene files | — | not-required | in-review |
 | T-002 | Draft ADR-001..007 | T-001 | required | todo |
 | T-003 | Solution skeleton and hosts | T-001 | required | todo |
 | T-004 | Local development environment | T-003 | required | todo |

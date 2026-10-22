@@ -17,6 +17,7 @@ Create the empty .NET 10 solution with the Api and Worker hosts and shared build
 - `global.json`, `Directory.Build.props`, `Directory.Packages.props`, solution file
 - `src/Hosts/TalepPazari.Api/`, `src/Hosts/TalepPazari.Worker/`, `src/Shared/TalepPazari.SharedKernel/`
 - `AGENTS.md` — only the "Commands" section
+- `.github/dependabot.yml` — create it with only the `nuget` entry (weekly, minor/patch grouped); the only exception to the `.github/*` rule below
 
 ## Must NOT change
 - Docs other than the Commands section, `.github/*`
