@@ -1,23 +1,23 @@
 <Project>
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>$(MSBuildProjectName)</RootNamespace>
 
-    <!-- Warnings are errors so the build stays at zero warnings. -->
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!--
-      NuGet audit advisories (NU1901-NU1904) stay warnings, not errors: a newly published
-      advisory for an existing dependency must not break every build overnight. They are
-      still reported and handled through Dependabot updates.
+      Warnings are errors so the build stays at zero warnings. This includes NuGet audit
+      advisories (NU1901-NU1904): a vulnerable dependency fails restore. If an advisory
+      cannot be fixed right away, suppress that single advisory explicitly with a
+      <NuGetAuditSuppress Include="advisory URL" /> item plus a reason and follow-up issue;
+      never exclude the NU190x codes globally.
     -->
-    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 
-    <!-- .NET analyzers and .editorconfig code style rules run during build. -->
+    <!-- .NET analyzers and .editorconfig code style rules run during build.
+         AnalysisLevel is pinned to the target framework so the rule set does not change with the SDK. -->
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
-    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisLevel>10.0</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 
     <!-- Reproducible output. -->
