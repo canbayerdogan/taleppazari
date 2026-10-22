@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Hosts/">
+    <Project Path="src/Hosts/TalepPazari.Api/TalepPazari.Api.csproj" />
+    <Project Path="src/Hosts/TalepPazari.Worker/TalepPazari.Worker.csproj" />
+  </Folder>
+  <Folder Name="/Shared/">
+    <Project Path="src/Shared/TalepPazari.SharedKernel/TalepPazari.SharedKernel.csproj" />
+  </Folder>
+</Solution>

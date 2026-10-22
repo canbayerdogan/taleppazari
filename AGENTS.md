@@ -50,7 +50,13 @@ If sources conflict, stop and report the conflict. Do not pick one silently.
 - Keep the "Context usage" section of your report honest (files read, searches, wasted effort).
 
 ## Commands
-> Filled in by task T-003. Until then no build commands exist.
+Run from the repository root. Requires the .NET SDK pinned in `global.json` (10.0.402 or a later 10.0 feature band).
+- Restore: `dotnet restore TalepPazari.slnx`
+- Build: `dotnet build TalepPazari.slnx` (warnings are errors; the build must stay at zero warnings)
+- Run Api: `dotnet run --project src/Hosts/TalepPazari.Api` (listens on `http://localhost:5080`, set in `Properties/launchSettings.json`)
+- Liveness check: `curl -i http://localhost:5080/health/live` (expects `200 Healthy`; placeholder until T-008)
+- Run Worker: `dotnet run --project src/Hosts/TalepPazari.Worker` (logs `Worker started`; Ctrl+C to stop)
+- Test: `dotnet test TalepPazari.slnx` (no test projects until T-006)
 
 ## Map
 - `SUMMARY.md`: product and architecture overview
