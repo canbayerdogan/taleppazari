@@ -16,6 +16,8 @@ Make every endpoint behave the same way: errors, correlation, versioning, health
 
 ## Allowed to change
 - `src/Hosts/**`, `src/Shared/**` (cross-cutting only), Example module endpoint, `tests/**`
+- `Directory.Packages.props` (new packages; each needs a license and maintenance check in your plan)
+- `AGENTS.md` Commands section
 - `docs/architecture/api-conventions.md` (new)
 
 ## Must NOT change
@@ -36,6 +38,8 @@ Make every endpoint behave the same way: errors, correlation, versioning, health
 - [ ] The same correlation ID appears in the response header, the log line and the emitted event.
 - [ ] OpenAPI document is generated and a snapshot test guards it.
 - [ ] Redaction test proves a sample password/token/message body is not logged.
+- [ ] An incoming correlation ID that is too long or contains unexpected characters is replaced by a generated one; a valid one is kept (tests prove both).
+- [ ] Readiness reports unhealthy when the local PostgreSQL (T-004) is stopped and healthy when it runs (show both results).
 
 ## Verification
 Run tests and show a sample request/response and the matching log line.
