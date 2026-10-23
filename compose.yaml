@@ -1,0 +1,35 @@
+# Local development environment. Not for production use.
+# Setup and commands: see "Local development" in README.md.
+# All values come from .env (copy .env.example). There are no default credentials here.
+
+# Fixed project name: every checkout and worktree on one machine shares this
+# project, its container and its data volume.
+name: taleppazari
+
+services:
+  postgres:
+    # PostgreSQL 18 with PostGIS 3.6. Tag pinned, digest not pinned (see README).
+    image: postgis/postgis:18-3.6
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env (copy .env.example)}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (copy .env.example)}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env (copy .env.example)}
+    ports:
+      # Loopback only: the database is not reachable from other machines.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # PostgreSQL 18 images keep data under /var/lib/postgresql/18/docker,
+      # so the volume is mounted at /var/lib/postgresql (not .../data).
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      # TCP check on purpose: during first-time init the image runs a temporary
+      # socket-only server while it creates the PostGIS extension. Checking over
+      # TCP reports healthy only once the real server is up.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  postgres-data:
