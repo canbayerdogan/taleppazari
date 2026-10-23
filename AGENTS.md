@@ -58,6 +58,13 @@ Run from the repository root. Requires the .NET SDK pinned in `global.json` (10.
 - Run Worker: `dotnet run --project src/Hosts/TalepPazari.Worker` (logs `Worker started`; Ctrl+C to stop)
 - Test: `dotnet test TalepPazari.slnx` (no test projects until T-006)
 
+Local database (PostgreSQL 18 + PostGIS, Docker Compose; details in README "Local development"):
+- First-time setup: `Copy-Item .env.example .env` (PowerShell) or `cp .env.example .env` (bash)
+- Start: `docker compose up -d`, then `docker compose ps` until `postgres` shows `healthy`
+- Stop / start (data kept): `docker compose stop` / `docker compose start`; `docker compose ps -a` shows stopped containers too (plain `ps` hides them)
+- PostGIS check: `"SELECT postgis_version();" | docker compose exec -T postgres sh -c 'psql -U $POSTGRES_USER -d $POSTGRES_DB'`
+- Reset (wipes data shared by all checkouts and worktrees on this machine): `docker compose down -v`, then `docker compose up -d`
+
 ## Map
 - `SUMMARY.md`: product and architecture overview
 - `docs/roadmap.md`: phases and exit criteria
