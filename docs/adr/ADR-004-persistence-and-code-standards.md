@@ -51,6 +51,7 @@ Every module owns its schema and DbContext ([ADR-002](ADR-002-module-boundaries-
 ## Revisit when
 - A module needs data access patterns that EF Core cannot serve within measured performance targets.
 - FluentValidation fails the license or maintenance check.
+- Identifiers shown to users must not reveal creation time (UUID v7 embeds a timestamp); reconsider the identifier format for such cases.
 
 ## Open
 - **Soft delete** is not decided. To be decided together with data retention in Phase 2.
