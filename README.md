@@ -33,7 +33,7 @@ docker compose ps              # wait until STATUS shows "(healthy)"
 | Task | Command |
 |---|---|
 | Start | `docker compose up -d` |
-| Status | `docker compose ps` |
+| Status | `docker compose ps -a` (`-a` also lists stopped containers) |
 | Stop (keeps data) | `docker compose stop` |
 | Start again | `docker compose start` |
 | Remove container (keeps data) | `docker compose down` |
@@ -41,10 +41,10 @@ docker compose ps              # wait until STATUS shows "(healthy)"
 | **Reset database (wipes all data)** | `docker compose down -v`, then `docker compose up -d` |
 
 ### Check that PostGIS works
-The command reads the user and database name from `.env` inside the container:
+The command reads the user and database name from `.env` inside the container. It works unchanged in PowerShell and bash; the SQL is piped in because Windows PowerShell 5.1 strips nested double quotes from arguments to native commands.
 
 ```powershell
-docker compose exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT postgis_version();"'
+"SELECT postgis_version();" | docker compose exec -T postgres sh -c 'psql -U $POSTGRES_USER -d $POSTGRES_DB'
 ```
 
 Expected output contains a line like `3.6 USE_GEOS=1 USE_PROJ=1 USE_STATS=1`.
