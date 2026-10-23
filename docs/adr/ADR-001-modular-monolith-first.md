@@ -1,6 +1,6 @@
 # ADR-001 — Modular monolith first
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-10-23)
 - **Date:** 2026-10-22
 - **Deciders:** project owner
 

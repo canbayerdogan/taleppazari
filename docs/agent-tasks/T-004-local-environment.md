@@ -1,7 +1,7 @@
 # T-004 — Local development environment
 
 - **Phase:** 1
-- **Status:** todo
+- **Status:** done
 - **Depends on:** T-003 (done)
 - **Approval:** required
 - **Branch:** `task/T-004-local-environment`
