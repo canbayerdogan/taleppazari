@@ -10,7 +10,7 @@ One brief per task. One task = one branch = one PR. Only the owner merges.
 | T-002 | Draft ADR-001..007 | T-001 | required | done |
 | T-003 | Solution skeleton and hosts | T-001 | required | done |
 | T-004 | Local development environment | T-003 | required | done |
-| T-005 | Module template and Example module | T-002 (proposed ADRs), T-003, T-004 | required | todo |
+| T-005 | Module template and Example module | T-003, T-004 (ADR-002..004 Accepted) | required | todo |
 | T-006 | Architecture tests | T-005 | required | todo |
 | T-007 | Outbox/Inbox and event dispatch | T-004, T-005, T-006 | required | todo |
 | T-008 | API and observability standards | T-003, T-004, T-005, T-006 | required | todo |
