@@ -1,7 +1,7 @@
 # T-002 — Draft ADR-001..007
 
 - **Phase:** 1
-- **Status:** todo
+- **Status:** done
 - **Depends on:** T-001
 - **Approval:** required
 - **Branch:** `task/T-002-draft-adrs`

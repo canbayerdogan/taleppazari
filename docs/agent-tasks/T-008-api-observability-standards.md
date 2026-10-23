@@ -2,7 +2,7 @@
 
 - **Phase:** 1
 - **Status:** todo
-- **Depends on:** T-003, T-005
+- **Depends on:** T-003, T-004, T-005, T-006
 - **Approval:** required
 - **Branch:** `task/T-008-api-observability`
 

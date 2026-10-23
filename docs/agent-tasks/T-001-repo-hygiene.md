@@ -1,7 +1,7 @@
 # T-001 — Repository hygiene files
 
 - **Phase:** 1
-- **Status:** todo
+- **Status:** done
 - **Depends on:** — (bootstrap pack already committed by the owner)
 - **Approval:** not-required
 - **Branch:** `task/T-001-repo-hygiene`

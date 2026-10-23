@@ -1,7 +1,7 @@
 # T-003 — Solution skeleton and hosts
 
 - **Phase:** 1
-- **Status:** todo
+- **Status:** done
 - **Depends on:** T-001
 - **Approval:** required
 - **Branch:** `task/T-003-solution-skeleton`
