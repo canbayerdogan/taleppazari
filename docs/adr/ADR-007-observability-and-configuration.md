@@ -9,9 +9,9 @@ Two stateless hosts run as multiple instances ([ADR-001](ADR-001-modular-monolit
 
 ## Decision
 - **Logging:** structured logging.
-- **Correlation IDs:** this ADR owns the correlation ID rule. A correlation ID is taken from the incoming request header (named in [ADR-006](ADR-006-api-conventions.md)) or created if missing, included in every log entry, and propagated into integration events and the handlers that process them.
+- **Correlation IDs:** this ADR owns the correlation ID rule. A correlation ID is taken from the incoming request header (named in [ADR-006](ADR-006-api-conventions.md)) only if it passes validation for length and allowed characters; otherwise, or if missing, a new one is generated. The accepted value is included in every log entry and propagated into integration events and the handlers that process them. Exact limits are set in T-008.
 - **Tracing and metrics:** OpenTelemetry for traces and metrics.
-- **Health:** liveness and readiness endpoints on each host.
+- **Health:** the Api exposes liveness and readiness HTTP endpoints. The Worker must also be observable as alive and able to work; the mechanism is not decided here (see Open).
 - **Configuration:** via environment variables and a secret store. No secrets in the repository; `.env.example` with placeholders only.
 - **Log redaction:** never log passwords, tokens, message bodies or unnecessary personal data.
 
@@ -31,10 +31,13 @@ Two stateless hosts run as multiple instances ([ADR-001](ADR-001-modular-monolit
 - **Sensitive data in logs.** Mitigated by redaction rules, structured logging (no string-concatenated payloads) and review.
 - **Secrets committed by mistake.** Mitigated by `.gitignore` rules, `.env.example` placeholders and review.
 - **Readiness checks that depend on too much** (cascading unavailability). Mitigated by keeping readiness limited to the host's own critical dependencies.
+- **Untrusted correlation ID header** (log injection, oversized values). Mitigated by validating length and characters and replacing invalid values.
+- **A stuck or dead Worker goes unnoticed** (no HTTP surface today). Mitigated once the Worker health mechanism is decided; until then, review of deployment setup.
 
 ## Enforcement
 - Implementation and tests in T-008: correlation ID middleware, propagation into events, health endpoints.
 - Review checklist: no secrets, no sensitive fields in log statements.
+- Tests in T-008: an invalid incoming correlation ID is replaced; a valid one is kept.
 
 ## Revisit when
 - Telemetry cost or volume becomes a measured problem.
@@ -43,3 +46,4 @@ Two stateless hosts run as multiple instances ([ADR-001](ADR-001-modular-monolit
 ## Open
 - **Secret store** product is not decided.
 - **Telemetry backend** is not decided.
+- **Worker health mechanism** (for example a small HTTP listener, a heartbeat record, or an orchestrator-level check) is not decided. Decide together with the deployment target.
