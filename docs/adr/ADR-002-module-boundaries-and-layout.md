@@ -20,6 +20,7 @@ Each module lives under `src/Modules/<Name>/` and has these projects:
 
 Rules:
 - Another module may reference **only** the `Contracts` project of a module.
+- The hosts (Api, Worker) may reference a module's `Infrastructure` and `Api` projects for composition only (service registration and endpoint mapping). The module-to-module rule applies between modules, not between hosts and modules.
 - Implementation types are `internal` where practical.
 - One PostgreSQL **schema** per module.
 - One **DbContext** and one **migration set** per module.
@@ -47,7 +48,7 @@ The layout is Proposed: the owner may adjust it when reviewing.
 - **Too many projects slowing builds.** Measure; revisit layout if it becomes a real problem.
 
 ## Enforcement
-- Architecture tests (T-006): a module references other modules only via `Contracts`; Domain does not reference EF Core, HTTP, messaging or provider libraries; SharedKernel does not reference any module.
+- Architecture tests (T-006): a module references other modules only via `Contracts`; hosts reference module `Infrastructure` and `Api` projects for composition only; Domain does not reference EF Core, HTTP, messaging or provider libraries; SharedKernel does not reference any module.
 - Migration and DbContext review: each DbContext maps only to its own schema.
 - Module template (T-005) produces this layout.
 - CI (T-009) runs the architecture tests.
