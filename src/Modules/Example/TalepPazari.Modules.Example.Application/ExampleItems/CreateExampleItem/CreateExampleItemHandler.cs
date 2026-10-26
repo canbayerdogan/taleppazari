@@ -22,6 +22,6 @@ public sealed class CreateExampleItemHandler(
         var item = ExampleItem.Create(Guid.CreateVersion7(now), command.Name!, now);
         await repository.AddAsync(item, cancellationToken);
 
-        return CreateExampleItemResult.Success(new ExampleItemResponse(item.Id, item.Name, item.CreatedAt));
+        return CreateExampleItemResult.Success(new CreatedExampleItem(item.Id, item.Name, item.CreatedAt));
     }
 }

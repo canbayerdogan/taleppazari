@@ -25,7 +25,7 @@ src/Modules/<Name>/
   TalepPazari.Modules.<Name>.Domain/           entities, value objects, invariants
   TalepPazari.Modules.<Name>.Application/      use cases, validators, persistence interfaces
   TalepPazari.Modules.<Name>.Infrastructure/   DbContext, configurations, migrations, Add<Name>Module
-  TalepPazari.Modules.<Name>.Api/              Map<Name>Endpoints
+  TalepPazari.Modules.<Name>.Api/              Map<Name>Endpoints, HTTP request/response records
 ```
 
 - [ ] Create the five `.csproj` files with `<Project Sdk="Microsoft.NET.Sdk">`. Target framework, nullable and analyzers come from `Directory.Build.props`; package versions come from `Directory.Packages.props` (no `Version` on `PackageReference`).
@@ -64,7 +64,8 @@ src/Modules/<Name>/
 
 ## 5. Api
 - [ ] `public static class <Name>Endpoints` with `Map<Name>Endpoints(this IEndpointRouteBuilder)`. Route prefix `/api/v1/<schema>` (T-008 owns the final convention).
-- [ ] Endpoints only translate HTTP to the use case and back: success → `TypedResults.Created(...)` / `Ok(...)`, validation failure → `TypedResults.ValidationProblem(errors)`. No business rules.
+- [ ] Request and response records (for example `Create<Entity>Request`, `<Entity>Response`) live in the Api project as `internal sealed record`s. Application types are not the HTTP contract.
+- [ ] Endpoints only translate HTTP to the use case and back: map the request to the command, then success → `TypedResults.Created(...)` / `Ok(...)` with the response record, validation failure → `TypedResults.ValidationProblem(errors)`. No business rules.
 
 ## 6. Register in the hosts
 - [ ] `src/Hosts/TalepPazari.Api`: reference `<Name>.Infrastructure` and `<Name>.Api`; in `Program.cs` call `builder.Services.Add<Name>Module(builder.Configuration);` and `app.Map<Name>Endpoints();`.
@@ -91,6 +92,6 @@ dotnet ef database update --project src/Modules/<Name>/TalepPazari.Modules.<Name
 
 ## 9. Verify
 - [ ] `dotnet build TalepPazari.slnx`: zero warnings.
-- [ ] `dotnet run --project src/Hosts/TalepPazari.Api`, then call the endpoint (`curl.exe` on Windows; add `--noproxy localhost` behind a proxy).
+- [ ] `dotnet run --project src/Hosts/TalepPazari.Api`, then call the endpoint with `curl.exe`. If your environment uses an HTTP proxy, add `--noproxy localhost` to `curl.exe`.
 - [ ] With the database stopped (`docker compose stop`), `dotnet run --project src/Hosts/TalepPazari.Worker` still logs `Worker started`.
 - [ ] Update `CONTEXT.md` and the generated maps if present.

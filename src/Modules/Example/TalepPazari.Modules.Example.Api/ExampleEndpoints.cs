@@ -16,19 +16,21 @@ public static class ExampleEndpoints
         return endpoints;
     }
 
-    // Maps HTTP to the use case and back; no business rules here.
+    // Maps the HTTP request to the use case and the result back to HTTP; no business rules here.
     private static async Task<Results<Created<ExampleItemResponse>, ValidationProblem>> CreateItemAsync(
-        CreateExampleItemCommand command,
+        CreateExampleItemRequest request,
         CreateExampleItemHandler handler,
         CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(command, cancellationToken);
+        var result = await handler.HandleAsync(new CreateExampleItemCommand(request.Name), cancellationToken);
         if (!result.IsSuccess)
         {
             return TypedResults.ValidationProblem(result.ValidationErrors);
         }
 
+        var response = new ExampleItemResponse(result.Item.Id, result.Item.Name, result.Item.CreatedAt);
+
         // No Location header: nothing serves the item URL yet.
-        return TypedResults.Created((string?)null, result.Item);
+        return TypedResults.Created((string?)null, response);
     }
 }
