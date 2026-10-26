@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\TalepPazari.Modules.Example.Application\TalepPazari.Modules.Example.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Relational is referenced directly so every host resolves the same EF Core version
+         (the Npgsql provider only sets a lower bound). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+  </ItemGroup>
+
+</Project>

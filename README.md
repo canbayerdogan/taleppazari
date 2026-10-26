@@ -49,6 +49,15 @@ The command reads the user and database name from `.env` inside the container. I
 
 Expected output contains a line like `3.6 USE_GEOS=1 USE_PROJ=1 USE_STATS=1`.
 
+### Point the hosts at the local database
+The Api and Worker hosts read one connection string, `ConnectionStrings:Default`. In development it comes from `dotnet user-secrets`; both hosts share one `UserSecretsId`, so one command configures both. Use the values from your own `.env`:
+
+```powershell
+dotnet user-secrets set "ConnectionStrings:Default" "Host=127.0.0.1;Port=<POSTGRES_PORT>;Database=<POSTGRES_DB>;Username=<POSTGRES_USER>;Password=<POSTGRES_PASSWORD>" --project src/Hosts/TalepPazari.Api
+```
+
+Use `127.0.0.1`, not `localhost`: the port is published on IPv4 loopback only, and `localhost` may resolve to IPv6 first and time out. The environment variable `ConnectionStrings__Default` works as an alternative. Never put the connection string in `appsettings*.json`. Then apply migrations as described in [AGENTS.md](AGENTS.md#commands); they are never applied at startup.
+
 ### Shared database across checkouts
 The compose project name is fixed to `taleppazari`. All checkouts and Git worktrees of this repository on one machine therefore share the same compose project, the same container and the same data volume. `docker compose down -v` run from any of them wipes that shared database.
 
