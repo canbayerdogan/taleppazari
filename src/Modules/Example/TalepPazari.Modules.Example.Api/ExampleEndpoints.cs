@@ -12,6 +12,8 @@ public static class ExampleEndpoints
     public static IEndpointRouteBuilder MapExampleEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/v1/example");
+
+        // Anonymous on purpose: Identity does not exist yet. Real endpoints authorize per resource in Application (Phase 2).
         group.MapPost("/items", CreateItemAsync);
         return endpoints;
     }

@@ -28,7 +28,27 @@ src/Modules/<Name>/
   TalepPazari.Modules.<Name>.Api/              Map<Name>Endpoints, HTTP request/response records
 ```
 
-- [ ] Create the five `.csproj` files with `<Project Sdk="Microsoft.NET.Sdk">`. Target framework, nullable and analyzers come from `Directory.Build.props`; package versions come from `Directory.Packages.props` (no `Version` on `PackageReference`).
+- [ ] Create the five `.csproj` files. Target framework, nullable, implicit usings and analyzers come from `Directory.Build.props`; package versions come from `Directory.Packages.props` (no `Version` on `PackageReference`). Start from the same minimal content as `src/Shared/TalepPazari.SharedKernel/TalepPazari.SharedKernel.csproj`, then add the references listed below:
+
+  ```xml
+  <Project Sdk="Microsoft.NET.Sdk">
+
+  </Project>
+  ```
+
+  The Api project also needs the ASP.NET Core framework reference:
+
+  ```xml
+  <Project Sdk="Microsoft.NET.Sdk">
+
+    <ItemGroup>
+      <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
+  </Project>
+  ```
+
+  Do not use `dotnet new classlib` output as is. If you use it, delete `Class1.cs` and the `TargetFramework`, `Nullable` and `ImplicitUsings` lines that `Directory.Build.props` already provides.
 - [ ] Project references (copy from Example):
   - Contracts: none
   - Domain: none
@@ -48,12 +68,17 @@ src/Modules/<Name>/
 - [ ] One folder per use case: command record, `AbstractValidator<T>`, handler class, result type. No mediator library.
 - [ ] The handler validates first, generates the id with `Guid.CreateVersion7(timeProvider.GetUtcNow())`, takes time from `TimeProvider`, calls the domain, then persists through an interface defined in Application (for example `I<Entity>Repository`).
 - [ ] `Add<Name>Application(this IServiceCollection)` registers validators and handlers.
-- [ ] Visibility: types that another project of the same module uses (handler, command, result, the registration method, repository interface) are `public`. No `InternalsVisibleTo`. Boundaries between modules are enforced by project references.
+- [ ] Visibility: types that another project of the same module uses (handler, command, result, the registration method, repository interface) are `public`. Validators are `internal`: they are registered explicitly in `Add<Name>Application` and only the handler uses them, through `IValidator<T>`. No `InternalsVisibleTo`. Boundaries between modules are enforced by project references.
+- [ ] Authorization: the Example endpoint is anonymous on purpose because Identity does not exist yet. Real endpoints must authorize per resource in the Application layer (AGENTS.md hard rule); the mechanism arrives with Identity in Phase 2.
 
 ## 4. Infrastructure
-- [ ] `internal sealed class <Name>DbContext` with `modelBuilder.HasDefaultSchema("<schema>")` and `ApplyConfiguration(...)` for each `IEntityTypeConfiguration<T>` (Fluent API only, `internal`).
+- [ ] `internal sealed class <Name>DbContext` with `modelBuilder.HasDefaultSchema(Schema)` and `ApplyConfiguration(...)` for each `IEntityTypeConfiguration<T>` (Fluent API only, `internal`).
+- [ ] Declare the schema constant on the DbContext: `internal const string Schema = "<schema>";`. The migrations history table setting below uses it.
 - [ ] Repository implementations are `internal`.
-- [ ] `public static class <Name>Module` with `Add<Name>Module(this IServiceCollection, IConfiguration)`. Copy `ExampleModule`: read `ConnectionStrings:Default` **inside** the `AddDbContext` callback (so hosts start without a database) and set the history table to the module schema:
+- [ ] `public static class <Name>Module` with `Add<Name>Module(this IServiceCollection, IConfiguration)`.
+- [ ] `Add<Name>Module` calls `services.Add<Name>Application();` (hosts call only `Add<Name>Module`).
+- [ ] `Add<Name>Module` registers the clock with `services.TryAddSingleton(TimeProvider.System);` (`TryAdd` so several modules can register it).
+- [ ] Copy `ExampleModule` for the DbContext registration: read `ConnectionStrings:Default` **inside** the `AddDbContext` callback (so hosts start without a database) and set the history table to the module schema:
 
   ```csharp
   options.UseNpgsql(connectionString, npgsql =>

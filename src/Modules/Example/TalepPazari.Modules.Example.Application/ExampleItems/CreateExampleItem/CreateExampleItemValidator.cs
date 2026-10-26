@@ -3,7 +3,7 @@ using TalepPazari.Modules.Example.Domain.ExampleItems;
 
 namespace TalepPazari.Modules.Example.Application.ExampleItems.CreateExampleItem;
 
-public sealed class CreateExampleItemValidator : AbstractValidator<CreateExampleItemCommand>
+internal sealed class CreateExampleItemValidator : AbstractValidator<CreateExampleItemCommand>
 {
     public CreateExampleItemValidator()
     {
