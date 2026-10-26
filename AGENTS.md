@@ -65,6 +65,12 @@ Local database (PostgreSQL 18 + PostGIS, Docker Compose; details in README "Loca
 - PostGIS check: `"SELECT postgis_version();" | docker compose exec -T postgres sh -c 'psql -U $POSTGRES_USER -d $POSTGRES_DB'`
 - Reset (wipes data shared by all checkouts and worktrees on this machine): `docker compose down -v`, then `docker compose up -d`
 
+Connection string and migrations (details in `docs/module-template/how-to-add-a-module.md`):
+- Restore local tools (pinned `dotnet-ef`): `dotnet tool restore`
+- Connection string, once per machine (both hosts share one `UserSecretsId`; values from your `.env`): `dotnet user-secrets set "ConnectionStrings:Default" "Host=127.0.0.1;Port=<POSTGRES_PORT>;Database=<POSTGRES_DB>;Username=<POSTGRES_USER>;Password=<POSTGRES_PASSWORD>" --project src/Hosts/TalepPazari.Api`
+- Apply a module's migrations (explicit only, never at startup): `dotnet ef database update --project src/Modules/<Name>/TalepPazari.Modules.<Name>.Infrastructure --startup-project src/Hosts/TalepPazari.Api --context <Name>DbContext`
+- Example module: `<Name>` = `Example`; endpoint `POST http://localhost:5080/api/v1/example/items` with body `{"name":"..."}`
+
 ## Map
 - `SUMMARY.md`: product and architecture overview
 - `docs/roadmap.md`: phases and exit criteria
@@ -72,3 +78,4 @@ Local database (PostgreSQL 18 + PostGIS, Docker Compose; details in README "Loca
 - `docs/adr/`: architecture decisions
 - `docs/templates/`: templates (task, ADR, CONTEXT, report)
 - `src/Modules/*/CONTEXT.md`: per-module context
+- `docs/module-template/how-to-add-a-module.md`: checklist for adding a module (`src/Modules/Example` is the reference)

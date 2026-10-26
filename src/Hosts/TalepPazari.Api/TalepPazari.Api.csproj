@@ -1,3 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
+  <PropertyGroup>
+    <!-- Shared with the Worker host so one `dotnet user-secrets set` configures both. -->
+    <UserSecretsId>taleppazari-local-dev</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Composition only: hosts reference module Infrastructure and Api projects (ADR-002). -->
+    <ProjectReference Include="..\..\Modules\Example\TalepPazari.Modules.Example.Api\TalepPazari.Modules.Example.Api.csproj" />
+    <ProjectReference Include="..\..\Modules\Example\TalepPazari.Modules.Example.Infrastructure\TalepPazari.Modules.Example.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Design-time only: lets `dotnet ef` use this host as the startup project. Not shipped. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+
 </Project>

@@ -3,6 +3,14 @@
     <Project Path="src/Hosts/TalepPazari.Api/TalepPazari.Api.csproj" />
     <Project Path="src/Hosts/TalepPazari.Worker/TalepPazari.Worker.csproj" />
   </Folder>
+  <Folder Name="/Modules/" />
+  <Folder Name="/Modules/Example/">
+    <Project Path="src/Modules/Example/TalepPazari.Modules.Example.Api/TalepPazari.Modules.Example.Api.csproj" />
+    <Project Path="src/Modules/Example/TalepPazari.Modules.Example.Application/TalepPazari.Modules.Example.Application.csproj" />
+    <Project Path="src/Modules/Example/TalepPazari.Modules.Example.Contracts/TalepPazari.Modules.Example.Contracts.csproj" />
+    <Project Path="src/Modules/Example/TalepPazari.Modules.Example.Domain/TalepPazari.Modules.Example.Domain.csproj" />
+    <Project Path="src/Modules/Example/TalepPazari.Modules.Example.Infrastructure/TalepPazari.Modules.Example.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/Shared/">
     <Project Path="src/Shared/TalepPazari.SharedKernel/TalepPazari.SharedKernel.csproj" />
   </Folder>

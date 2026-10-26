@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\TalepPazari.Modules.Example.Contracts\TalepPazari.Modules.Example.Contracts.csproj" />
+    <ProjectReference Include="..\TalepPazari.Modules.Example.Domain\TalepPazari.Modules.Example.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+</Project>
