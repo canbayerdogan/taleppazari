@@ -27,7 +27,10 @@ Show, with the smallest possible code, how a module is laid out, registered, per
 - Key tables/entities: `example."ExampleItems"`, migrations history in `example."__EFMigrationsHistory"`
 
 ## Invariants and rules
-- Name is required, not blank, at most 200 characters: FluentValidation at the boundary (400), `ExampleItem.Create` in the domain, `varchar(200) NOT NULL` plus a not-blank check constraint in the database.
+- Name is required, not blank, at most 200 characters: FluentValidation at the boundary (400), `ExampleItem.Create` in the domain, `varchar(200) NOT NULL` plus a check constraint in the database.
+- The validator and the domain reject any whitespace-only name. The database check constraint (`btrim("Name") <> ''`) is only a backstop: it trims spaces only.
+- Length: the application counts UTF-16 code units, `varchar(200)` counts characters, so the application is stricter.
+- Authorization: the endpoint is anonymous on purpose because Identity does not exist yet. Real endpoints must authorize per resource in the Application layer (AGENTS.md hard rule); the mechanism arrives with Identity in Phase 2.
 - Id is a non-empty UUID v7 generated in the application; `CreatedAt` is UTC from `TimeProvider`.
 
 ## Key flows
@@ -39,10 +42,10 @@ Show, with the smallest possible code, how a module is laid out, registered, per
 ## Gotchas for agents
 - Example-level choices, not architecture decisions: domain invariants throw `ArgumentException`, and `CreateExampleItemResult` is a module-local result type. A shared Result and error model are decided when a second module needs them.
 - The HTTP contract (`CreateExampleItemRequest`, `ExampleItemResponse`) lives in the Api project and is internal; Application types are not exposed over HTTP.
-- Visibility: Application types used by another project of this module (handler, command, result, `AddExampleApplication`) are public. Infrastructure types are internal except `ExampleModule`. Boundaries between modules are enforced by project references, not by visibility. No `InternalsVisibleTo`.
+- Visibility: Application types used by another project of this module (handler, command, result, `AddExampleApplication`) are public; the validator is internal (registered explicitly in `AddExampleApplication`). Infrastructure types are internal except `ExampleModule`. Boundaries between modules are enforced by project references, not by visibility. No `InternalsVisibleTo`.
 - Table and column names use default EF Core naming (PascalCase), so SQL needs quoted identifiers: `example."ExampleItems"`, `"Name"`. A naming convention is not decided yet.
 - The connection string is resolved when a DbContext is first created, not at startup; a host starts without a database.
 - Migration files are tool-generated; do not hand-edit them for style (a scoped `.editorconfig` section covers them).
 
 ## Last verified
-- Commit: to be filled when the T-005 PR is merged (branched from main at `3e8a598`) — Date: 2026-10-26
+- Verified against main at 3e8a598 (T-005 branch point), 2026-10-26
