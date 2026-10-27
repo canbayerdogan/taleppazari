@@ -1,7 +1,7 @@
 # T-006 — Architecture tests
 
 - **Phase:** 1
-- **Status:** todo
+- **Status:** done
 - **Depends on:** T-005 (done); ADR-005 (Accepted)
 - **Approval:** required
 - **Branch:** `task/T-006-architecture-tests`
