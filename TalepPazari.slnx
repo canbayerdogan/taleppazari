@@ -14,4 +14,7 @@
   <Folder Name="/Shared/">
     <Project Path="src/Shared/TalepPazari.SharedKernel/TalepPazari.SharedKernel.csproj" />
   </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="tests/TalepPazari.ArchitectureTests/TalepPazari.ArchitectureTests.csproj" />
+  </Folder>
 </Solution>
