@@ -1,7 +1,7 @@
 # T-005 — Module template and Example module
 
 - **Phase:** 1
-- **Status:** todo
+- **Status:** done
 - **Depends on:** T-003, T-004 (ADR-002, ADR-003, ADR-004 are Accepted)
 - **Approval:** required
 - **Branch:** `task/T-005-module-template`
