@@ -1,6 +1,6 @@
 # ADR-005 — Testing strategy
 
-- **Status:** Accepted
+- **Status:** Accepted (2026-10-27)
 - **Date:** 2026-10-22
 - **Deciders:** project owner
 
