@@ -1,7 +1,7 @@
 # T-007 — Outbox/Inbox and event dispatch
 
 - **Phase:** 1
-- **Status:** todo
+- **Status:** done
 - **Depends on:** T-004, T-005, T-006 (done); ADR-003 (Accepted), ADR-005 (Accepted)
 - **Approval:** required
 - **Branch:** `task/T-007-outbox-inbox`
