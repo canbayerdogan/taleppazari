@@ -38,7 +38,10 @@ Show, with the smallest possible code, how a module is laid out, registered, per
 
 ## Key flows
 - Create item: `CreateExampleItemRequest` → endpoint maps it to `CreateExampleItemCommand` → `CreateExampleItemHandler` (validate, create entity, stage it, stage `ExampleItemCreatedV1` in the outbox, commit both with one `SaveChanges`) → endpoint maps the result to `ExampleItemResponse` → 201, or 400 `ValidationProblem`.
-- Deliver the event (Worker host): the outbox dispatcher claims the row through `ExampleOutboxStore` → `InboxIntegrationEventHandler<ExampleItemCreatedV1>` inserts the inbox row, runs `RecordExampleItemCreatedReceiptHandler` and commits both → the dispatcher marks the row processed. On failure it retries with back-off and dead-letters at `Outbox:MaxAttempts`.
+- Deliver the event (Worker host): the outbox dispatcher claims the row through `ExampleOutboxStore` → `InboxIntegrationEventHandler<ExampleItemCreatedV1>` inserts the inbox row, runs `RecordExampleItemCreatedReceiptHandler` and commits both → the dispatcher marks the row processed. On failure it retries with back-off and dead-letters at `Outbox:MaxAttempts`. `LastError` holds only the exception type name; Warning/Error logs carry the type and message id, and the full exception is logged at Debug only (an exception message may contain data).
+
+## Known limits
+- A shutdown or a failed result write in the middle of a batch leaves the remaining claimed messages with their incremented `Attempts` and their lease until it expires. Frequent interruptions can therefore dead-letter a healthy message. Accepted for now; to revisit with the deployment target.
 
 ## Related ADRs and tasks
 - ADR-002, ADR-003, ADR-004; T-005 (this module), T-006 (architecture tests), T-007 (outbox), T-008 (API conventions)

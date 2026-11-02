@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using TalepPazari.Modules.Example.Application.ExampleItems.CreateExampleItem;
 using TalepPazari.Modules.Example.Infrastructure;
@@ -21,11 +22,12 @@ public sealed class ExampleTestHost : IAsyncDisposable
         ["Outbox:RetryMaxDelay"] = "00:00:10",
     };
 
-    private ExampleTestHost(string connectionString, ManualTimeProvider clock, ServiceProvider services)
+    private ExampleTestHost(string connectionString, ManualTimeProvider clock, ServiceProvider services, TestLoggerProvider logs)
     {
         ConnectionString = connectionString;
         Clock = clock;
         Services = services;
+        Logs = logs;
     }
 
     public string ConnectionString { get; }
@@ -33,6 +35,9 @@ public sealed class ExampleTestHost : IAsyncDisposable
     public ManualTimeProvider Clock { get; }
 
     public ServiceProvider Services { get; }
+
+    // Every log entry of this host, all levels including Debug.
+    public TestLoggerProvider Logs { get; }
 
     public OutboxDispatcher Dispatcher => Services.GetRequiredService<OutboxDispatcher>();
 
@@ -58,15 +63,19 @@ public sealed class ExampleTestHost : IAsyncDisposable
         };
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
 
+        var logs = new TestLoggerProvider();
         var services = new ServiceCollection();
-        services.AddLogging();
+        services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Debug).AddProvider(logs));
         services.AddSingleton<TimeProvider>(clock);
         services.AddExampleModule(configuration);
         services.AddOutboxDispatcher(configuration);
         configure?.Invoke(services);
 
         return new ExampleTestHost(
-            connectionString, clock, services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true }));
+            connectionString,
+            clock,
+            services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true }),
+            logs);
     }
 
     // A second "Worker instance": same database and clock, its own services.
@@ -83,12 +92,18 @@ public sealed class ExampleTestHost : IAsyncDisposable
 
     public Task<OutboxDispatchResult> RunOnceAsync() => Dispatcher.RunOnceAsync(TestContext.Current.CancellationToken);
 
-    public async Task<IReadOnlyList<OutboxMessage>> ClaimAsync(Guid claimToken, int batchSize)
+    public Task<IReadOnlyList<OutboxMessage>> ClaimAsync(Guid claimToken, int batchSize, CancellationToken? cancellationToken = null)
+    {
+        var now = Clock.GetUtcNow();
+        return WithStoreAsync(store => store.ClaimAsync(
+            claimToken, batchSize, now, now + TimeSpan.FromMinutes(1), cancellationToken ?? TestContext.Current.CancellationToken));
+    }
+
+    // Runs one call against the module's IOutboxStore in its own scope, as the dispatcher does.
+    public async Task<T> WithStoreAsync<T>(Func<IOutboxStore, Task<T>> call)
     {
         await using var scope = Services.CreateAsyncScope();
-        var store = scope.ServiceProvider.GetServices<IOutboxStore>().Single();
-        var now = Clock.GetUtcNow();
-        return await store.ClaimAsync(claimToken, batchSize, now, now + TimeSpan.FromMinutes(1), TestContext.Current.CancellationToken);
+        return await call(scope.ServiceProvider.GetServices<IOutboxStore>().Single());
     }
 
     public async Task<T> ScalarAsync<T>(string sql)
