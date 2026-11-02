@@ -52,7 +52,7 @@ src/Modules/<Name>/
 - [ ] Project references (copy from Example):
   - Contracts: none
   - Domain: none
-  - Application → Domain, Contracts; packages `FluentValidation`, `Microsoft.Extensions.DependencyInjection.Abstractions`
+  - Application → Domain, Contracts, `src/Shared/TalepPazari.SharedKernel` (unit of work, outbox and handler interfaces); packages `FluentValidation`, `Microsoft.Extensions.DependencyInjection.Abstractions`
   - Infrastructure → Application; packages `Microsoft.EntityFrameworkCore.Relational`, `Npgsql.EntityFrameworkCore.PostgreSQL`
   - Api → Application; `<FrameworkReference Include="Microsoft.AspNetCore.App" />`
   - Another module's project: **only** its `Contracts` project.
@@ -66,8 +66,9 @@ src/Modules/<Name>/
 
 ## 3. Application
 - [ ] One folder per use case: command record, `AbstractValidator<T>`, handler class, result type. No mediator library.
-- [ ] The handler validates first, generates the id with `Guid.CreateVersion7(timeProvider.GetUtcNow())`, takes time from `TimeProvider`, calls the domain, then persists through an interface defined in Application (for example `I<Entity>Repository`).
-- [ ] `Add<Name>Application(this IServiceCollection)` registers validators and handlers.
+- [ ] The handler validates first, generates the id with `Guid.CreateVersion7(timeProvider.GetUtcNow())`, takes time from `TimeProvider`, calls the domain, then stages changes through an interface defined in Application (for example `I<Entity>Repository.Add`, which does not save).
+- [ ] The handler commits with the module's unit of work: stage the entity, stage any integration event with `outbox.Add(...)`, then `await unitOfWork.SaveChangesAsync(...)`. Both commit in one transaction, so the event exists if and only if the state change committed. Inject them keyed with the module's key: `[FromKeyedServices(<Name>ApplicationRegistration.ServiceKey)] IOutbox outbox` and `... IUnitOfWork unitOfWork` (every module implements the same SharedKernel interfaces).
+- [ ] `Add<Name>Application(this IServiceCollection)` registers validators and handlers, and declares `public const string ServiceKey = "<Name>";`. Integration event handlers are registered as their concrete type only; Infrastructure exposes them behind the inbox decorator (step 8).
 - [ ] Visibility: types that another project of the same module uses (handler, command, result, the registration method, repository interface) are `public`. Validators are `internal`: they are registered explicitly in `Add<Name>Application` and only the handler uses them, through `IValidator<T>`. No `InternalsVisibleTo`. Boundaries between modules are enforced by project references.
 - [ ] Authorization: the Example endpoint is anonymous on purpose because Identity does not exist yet. Real endpoints must authorize per resource in the Application layer (AGENTS.md hard rule); the mechanism arrives with Identity in Phase 2.
 
@@ -108,15 +109,28 @@ dotnet ef database update --project src/Modules/<Name>/TalepPazari.Modules.<Name
 - [ ] Keep migrations in `Persistence/Migrations`. Migration files are tool-generated and covered by the scoped `.editorconfig` section for `src/Modules/**/Persistence/Migrations/*.cs`; do not hand-edit them for style.
 - [ ] Review the generated migration: only schema `<schema>`, no foreign keys to other schemas.
 - [ ] Migrations are applied by this explicit command only, never at startup.
+- [ ] `<Name>Module.MigrateDatabaseAsync(IServiceProvider, CancellationToken)` (copy from `ExampleModule`) is for integration tests and tooling only. Hosts never call it. (No architecture test checks this yet; one could be added later.)
 - [ ] Check: `"\dt <schema>.*" | docker compose exec -T postgres sh -c 'psql -U $POSTGRES_USER -d $POSTGRES_DB'` lists your tables and `__EFMigrationsHistory`.
 
 ## 8. Facades and integration events
-- [ ] **Integration events** this module publishes: `Contracts/IntegrationEvents/<Event>V1.cs`, a `public sealed record` with a version suffix (final naming rule: T-006). Publishing goes through the outbox (T-007).
+Integration events use a per-module outbox and inbox (ADR-003). The Worker host's dispatcher claims messages from every module, delivers them in-process and records the result; Example shows every piece.
+
+- [ ] **Integration events** this module publishes: `Contracts/IntegrationEvents/<Event>V1.cs`, a `public sealed record` named `<Name>V<N>` (enforced by the architecture tests). The outbox stores the event under its full type name, so renaming or moving a published event breaks messages that are still pending: add a new version instead.
+- [ ] **Outbox and inbox tables** in the module schema (copy `Messaging/OutboxEntry*` and `Messaging/InboxEntry*` from Example, then `dotnet ef migrations add`): `<schema>."OutboxMessages"` with the partial index on `NextAttemptAt`, and `<schema>."InboxMessages"` keyed by (MessageId, HandlerName).
+- [ ] **Infrastructure pieces**, all `internal`, registered in `Add<Name>Module` (copy from `ExampleModule`):
+  - `<Name>UnitOfWork : IUnitOfWork` and `<Name>Outbox : IOutbox`, keyed with `<Name>ApplicationRegistration.ServiceKey`.
+  - `<Name>IntegrationEventTypes : IIntegrationEventTypes` listing every event the module publishes (singleton). The outbox refuses unlisted types; the dispatcher dead-letters stored names no registry knows.
+  - `<Name>OutboxStore : IOutboxStore` (scoped). Every time value is a parameter from the dispatcher's `TimeProvider`; never use the database `now()`.
+  - `InboxIntegrationEventHandler<TEvent>`: every `IIntegrationEventHandler<T>` the module consumes is registered **only** through it (`AddInboxHandler<TEvent, THandler>`). The inbox key is the handler's full type name including namespace, so renaming a handler class makes already-handled messages look new.
+- [ ] **Consuming** another module's event: reference its `Contracts` project, implement `IIntegrationEventHandler<TheirEventV1>` in your Application, and register it behind **your** module's inbox decorator. The inbox row and your effect commit in one transaction in your schema.
+- [ ] **Delivery is at-least-once.** A message is retried as a whole when any handler fails (handlers that already succeeded are skipped by the inbox); at `Outbox:MaxAttempts` it is dead-lettered for all handlers. Event ordering and outbox/inbox retention are not decided (ADR-003 Open): do not rely on either.
+- [ ] **Lease:** the Worker claims `Outbox:BatchSize` messages per module under one lease of `Outbox:LeaseDuration` and handles them one after another. Keep `BatchSize × worst-case handler time` below `LeaseDuration`, or another Worker may deliver the same messages again (harmless because of the inbox, but wasted work).
 - [ ] **Facades** (synchronous calls from other modules, preferably read-only queries): the interface and its DTOs go in `Contracts` (for example `Contracts/I<Name>Queries.cs`); the implementation is `internal` in Infrastructure or Application and registered in `Add<Name>Module`. Add one only when a consumer exists.
 - [ ] Consuming another module: reference only its `Contracts` project.
 
 ## 9. Verify
 - [ ] `dotnet build TalepPazari.slnx`: zero warnings.
 - [ ] `dotnet run --project src/Hosts/TalepPazari.Api`, then call the endpoint with `curl.exe`. If your environment uses an HTTP proxy, add `--noproxy localhost` to `curl.exe`.
-- [ ] With the database stopped (`docker compose stop`), `dotnet run --project src/Hosts/TalepPazari.Worker` still logs `Worker started`.
+- [ ] With the database stopped (`docker compose stop`), `dotnet run --project src/Hosts/TalepPazari.Worker` still logs `Worker started`, then logs failed outbox passes and backs off without stopping.
+- [ ] Integration tests for the module's outbox and handlers go in `tests/TalepPazari.IntegrationTests` (see AGENTS.md "Commands").
 - [ ] Update `CONTEXT.md` and the generated maps if present.

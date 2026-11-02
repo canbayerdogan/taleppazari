@@ -16,5 +16,6 @@
   </Folder>
   <Folder Name="/Tests/">
     <Project Path="tests/TalepPazari.ArchitectureTests/TalepPazari.ArchitectureTests.csproj" />
+    <Project Path="tests/TalepPazari.IntegrationTests/TalepPazari.IntegrationTests.csproj" />
   </Folder>
 </Solution>

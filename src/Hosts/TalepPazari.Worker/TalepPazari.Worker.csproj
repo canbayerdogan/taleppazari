@@ -14,4 +14,9 @@
     <ProjectReference Include="..\..\Modules\Example\TalepPazari.Modules.Example.Infrastructure\TalepPazari.Modules.Example.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The outbox dispatcher depends only on the SharedKernel messaging abstractions. -->
+    <ProjectReference Include="..\..\Shared\TalepPazari.SharedKernel\TalepPazari.SharedKernel.csproj" />
+  </ItemGroup>
+
 </Project>

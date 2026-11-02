@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="xunit.v3.mtp-off" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The tests compose the Worker dispatcher and the Example module the same way the Worker host does. -->
+    <ProjectReference Include="..\..\src\Hosts\TalepPazari.Worker\TalepPazari.Worker.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Example\TalepPazari.Modules.Example.Infrastructure\TalepPazari.Modules.Example.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

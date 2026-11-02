@@ -1,4 +1,5 @@
 namespace TalepPazari.Modules.Example.Contracts.IntegrationEvents;
 
-// Defined only. Publishing through the outbox arrives with T-007.
+// Published through the Example outbox when an item is created; stored under its full type name,
+// so renaming or moving it breaks messages that are still pending.
 public sealed record ExampleItemCreatedV1(Guid ItemId, DateTimeOffset OccurredAt);
