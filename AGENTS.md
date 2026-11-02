@@ -55,9 +55,11 @@ Run from the repository root. Requires the .NET SDK pinned in `global.json` (10.
 - Build: `dotnet build TalepPazari.slnx` (warnings are errors; the build must stay at zero warnings)
 - Run Api: `dotnet run --project src/Hosts/TalepPazari.Api` (listens on `http://localhost:5080`, set in `Properties/launchSettings.json`)
 - Liveness check: `curl -i http://localhost:5080/health/live` (expects `200 Healthy`; placeholder until T-008)
-- Run Worker: `dotnet run --project src/Hosts/TalepPazari.Worker` (logs `Worker started`; Ctrl+C to stop)
+- Run Worker: `dotnet run --project src/Hosts/TalepPazari.Worker` (logs `Worker started`, then runs the outbox dispatcher; settings in the `Outbox` section of its `appsettings.json`; Ctrl+C to stop)
 - Test: `dotnet test TalepPazari.slnx` (builds every project under `src/` first; architecture tests need no database, Docker or network)
 - One test class: `dotnet test TalepPazari.slnx --filter "FullyQualifiedName~ModuleReferenceTests"`
+- Integration tests only: `dotnet test tests/TalepPazari.IntegrationTests`. They need Docker: Testcontainers starts a throwaway `postgis/postgis:18-3.6` container (same image as `compose.yaml`) and gives each test its own database, so local data is never touched. Without Docker they are skipped with a message, and the rest of `dotnet test` still runs.
+- Force the integration tests (fail instead of skip when Docker is missing; CI uses this): set `TALEPPAZARI_REQUIRE_DOCKER=true` first (PowerShell `$env:TALEPPAZARI_REQUIRE_DOCKER = 'true'`, bash `TALEPPAZARI_REQUIRE_DOCKER=true dotnet test ...`)
 - Architecture tests (`tests/TalepPazari.ArchitectureTests`) discover modules by the `TalepPazari.Modules.<Name>.<Layer>` convention; a new module needs no test change. A failure message names the rule and the offending project or type.
 
 Local database (PostgreSQL 18 + PostGIS, Docker Compose; details in README "Local development"):
@@ -80,4 +82,6 @@ Connection string and migrations (details in `docs/module-template/how-to-add-a-
 - `docs/adr/`: architecture decisions
 - `docs/templates/`: templates (task, ADR, CONTEXT, report)
 - `src/Modules/*/CONTEXT.md`: per-module context
-- `docs/module-template/how-to-add-a-module.md`: checklist for adding a module (`src/Modules/Example` is the reference)
+- `docs/module-template/how-to-add-a-module.md`: checklist for adding a module (`src/Modules/Example` is the reference), including the outbox/inbox pattern
+- `src/Shared/TalepPazari.SharedKernel/Messaging/`: outbox, inbox and unit-of-work abstractions; `src/Hosts/TalepPazari.Worker/Outbox/`: the dispatcher
+- `tests/TalepPazari.IntegrationTests/`: PostgreSQL integration tests (Testcontainers)

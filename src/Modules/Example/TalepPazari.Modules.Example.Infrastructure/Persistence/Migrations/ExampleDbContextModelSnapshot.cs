@@ -43,6 +43,100 @@ namespace TalepPazari.Modules.Example.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_ExampleItems_Name_NotBlank", "btrim(\"Name\") <> ''");
                         });
                 });
+
+            modelBuilder.Entity("TalepPazari.Modules.Example.Domain.ExampleItems.ExampleItemCreatedReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ExampleItemCreatedReceipts", "example");
+                });
+
+            modelBuilder.Entity("TalepPazari.Modules.Example.Infrastructure.Messaging.InboxEntry", b =>
+                {
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("HandlerName")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("MessageId", "HandlerName");
+
+                    b.ToTable("InboxMessages", "example");
+                });
+
+            modelBuilder.Entity("TalepPazari.Modules.Example.Infrastructure.Messaging.OutboxEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset?>("DeadLetteredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid?>("LockedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("LockedUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TraceParent")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NextAttemptAt")
+                        .HasDatabaseName("IX_OutboxMessages_Pending_NextAttemptAt")
+                        .HasFilter("\"ProcessedAt\" IS NULL AND \"DeadLetteredAt\" IS NULL");
+
+                    b.ToTable("OutboxMessages", "example", t =>
+                        {
+                            t.HasCheckConstraint("CK_OutboxMessages_Attempts_NotNegative", "\"Attempts\" >= 0");
+
+                            t.HasCheckConstraint("CK_OutboxMessages_NotProcessedAndDeadLettered", "\"ProcessedAt\" IS NULL OR \"DeadLetteredAt\" IS NULL");
+                        });
+                });
 #pragma warning restore 612, 618
         }
     }

@@ -4,6 +4,6 @@ namespace TalepPazari.Modules.Example.Application.ExampleItems;
 
 public interface IExampleItemRepository
 {
-    // Adds and saves immediately. A unit of work that also writes the outbox arrives with T-007.
-    Task AddAsync(ExampleItem item, CancellationToken cancellationToken);
+    // Stages the item; the module's IUnitOfWork commits it together with any outbox message.
+    void Add(ExampleItem item);
 }
