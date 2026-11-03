@@ -5,9 +5,8 @@ using Testcontainers.PostgreSql;
 namespace TalepPazari.IntegrationTests.Support;
 
 // One PostgreSQL container per fixture (ADR-005): per test run in this project (assembly fixture,
-// AssemblyFixtures.cs); per test class in TalepPazari.ApiTests, which links this file.
-// Every test gets its own database, so tests never touch the developer's local data
-// and never see each other's rows.
+// AssemblyFixtures.cs); per test class in TalepPazari.ApiTests, which links this file. Every test gets its own database, so tests never
+// touch the developer's local data and never see each other's rows.
 public sealed class PostgresFixture : IAsyncLifetime
 {
     // Same image as compose.yaml.
