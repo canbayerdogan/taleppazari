@@ -15,6 +15,7 @@
     <Project Path="src/Shared/TalepPazari.SharedKernel/TalepPazari.SharedKernel.csproj" />
   </Folder>
   <Folder Name="/Tests/">
+    <Project Path="tests/TalepPazari.ApiTests/TalepPazari.ApiTests.csproj" />
     <Project Path="tests/TalepPazari.ArchitectureTests/TalepPazari.ArchitectureTests.csproj" />
     <Project Path="tests/TalepPazari.IntegrationTests/TalepPazari.IntegrationTests.csproj" />
   </Folder>

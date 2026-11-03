@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="xunit.v3.mtp-off" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The tests start the real Api host in memory (WebApplicationFactory<Program>). -->
+    <ProjectReference Include="..\..\src\Hosts\TalepPazari.Api\TalepPazari.Api.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- One source for the PostgreSQL fixture and test helpers; used here per test class, not per assembly. -->
+    <Compile Include="..\TalepPazari.IntegrationTests\Support\PostgresFixture.cs" Link="Support\Linked\PostgresFixture.cs" />
+    <Compile Include="..\TalepPazari.IntegrationTests\Support\TestLoggerProvider.cs" Link="Support\Linked\TestLoggerProvider.cs" />
+    <Compile Include="..\TalepPazari.IntegrationTests\Support\ManualTimeProvider.cs" Link="Support\Linked\ManualTimeProvider.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The committed OpenAPI snapshot; see Snapshots/OpenApiSnapshotTests.cs for how to update it. -->
+    <None Include="Snapshots\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

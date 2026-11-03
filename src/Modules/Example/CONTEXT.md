@@ -18,7 +18,7 @@ Show, with the smallest possible code, how a module is laid out, registered, per
 - Query/command facades: none (no consumer exists; see the how-to for where one goes)
 - Integration events published (name, version): `ExampleItemCreatedV1`, through the outbox, in the same transaction as the item
 - Integration events consumed (name, from module): `ExampleItemCreatedV1` from Example itself (demo only: `RecordExampleItemCreatedReceiptHandler`)
-- HTTP endpoints (route prefix): `/api/v1/example` (`POST /api/v1/example/items`)
+- HTTP endpoints (route prefix): `/example` under the host's `/api/v1` group: `POST /api/v1/example/items`, `GET /api/v1/example/items` (cursor pagination, reference implementation of `docs/architecture/api-conventions.md`)
 
 ## Allowed dependencies
 - Modules (Contracts only): none
@@ -35,17 +35,25 @@ Show, with the smallest possible code, how a module is laid out, registered, per
 - Length: the application counts UTF-16 code units, `varchar(200)` counts characters, so the application is stricter.
 - Authorization: the endpoint is anonymous on purpose because Identity does not exist yet. Real endpoints must authorize per resource in the Application layer (AGENTS.md hard rule); the mechanism arrives with Identity in Phase 2.
 - Id is a non-empty UUID v7 generated in the application; `CreatedAt` is UTC from `TimeProvider`.
+- List paging: `limit` 1..100 (default 20; out of range is a 400, never clamped), opaque `cursor` (invalid is a 400), ascending `Id`. Constants on `ListExampleItemsQuery`.
 
 ## Key flows
 - Create item: `CreateExampleItemRequest` → endpoint maps it to `CreateExampleItemCommand` → `CreateExampleItemHandler` (validate, create entity, stage it, stage `ExampleItemCreatedV1` in the outbox, commit both with one `SaveChanges`) → endpoint maps the result to `ExampleItemResponse` → 201, or 400 `ValidationProblem`.
-- Deliver the event (Worker host): the outbox dispatcher claims the row through `ExampleOutboxStore` → `InboxIntegrationEventHandler<ExampleItemCreatedV1>` inserts the inbox row, runs `RecordExampleItemCreatedReceiptHandler` and commits both → the dispatcher marks the row processed. On failure it retries with back-off and dead-letters at `Outbox:MaxAttempts`.
+- List items: `?limit=&cursor=` → `ListExampleItemsQuery` → `ListExampleItemsHandler` (validate, decode the cursor with `ExampleItemCursor`, ask `IExampleItemQueries` for `limit + 1` rows after the last Id, encode `nextCursor` when the extra row exists) → `ExampleItemPageResponse` → 200, or 400 `ValidationProblem`. The query is `ExampleItemQueries` (Infrastructure, `AsNoTracking`, `"Id" > last ORDER BY "Id"`).
+- Deliver the event (Worker host): the outbox dispatcher claims the row through `ExampleOutboxStore` → `InboxIntegrationEventHandler<ExampleItemCreatedV1>` inserts the inbox row, runs `RecordExampleItemCreatedReceiptHandler` and commits both → the dispatcher marks the row processed. On failure it retries with back-off and dead-letters at `Outbox:MaxAttempts`. `LastError` holds only the exception type name; Warning/Error logs carry the type and message id, and the full exception is logged at Debug only (an exception message may contain data).
+
+## Known limits
+- Paging: UUID v7 Ids created within the same millisecond are ordered randomly, so an item created in the same millisecond as the last item of a served page may not appear on later pages (see `docs/architecture/api-conventions.md`).
+- A shutdown or a failed result write in the middle of a batch leaves the remaining claimed messages with their incremented `Attempts` and their lease until it expires. Frequent interruptions can therefore dead-letter a healthy message. Accepted for now; to revisit with the deployment target.
 
 ## Related ADRs and tasks
-- ADR-002, ADR-003, ADR-004; T-005 (this module), T-006 (architecture tests), T-007 (outbox), T-008 (API conventions)
+- ADR-002, ADR-003, ADR-004, ADR-006; T-005 (this module), T-006 (architecture tests), T-007 (outbox), T-008a (API conventions)
 
 ## Gotchas for agents
 - Example-level choices, not architecture decisions: domain invariants throw `ArgumentException`, and `CreateExampleItemResult` is a module-local result type. A shared Result and error model are decided when a second module needs them.
-- The HTTP contract (`CreateExampleItemRequest`, `ExampleItemResponse`) lives in the Api project and is internal; Application types are not exposed over HTTP.
+- The HTTP contract (`CreateExampleItemRequest`, `ExampleItemResponse`, `ExampleItemPageResponse`) lives in the Api project and is internal; Application types are not exposed over HTTP.
+- `ExampleItemCursor` (Application, internal) is a per-module copy of the cursor codec until a second module needs it.
+- Changing an endpoint changes the OpenAPI snapshot (`tests/TalepPazari.ApiTests/Snapshots/openapi-v1.json`); update it deliberately.
 - Visibility: Application types used by another project of this module (handler, command, result, `AddExampleApplication`) are public; the validator is internal (registered explicitly in `AddExampleApplication`). Infrastructure types are internal except `ExampleModule`. Boundaries between modules are enforced by project references, not by visibility. No `InternalsVisibleTo`.
 - Table and column names use default EF Core naming (PascalCase), so SQL needs quoted identifiers: `example."ExampleItems"`, `"Name"`. A naming convention is not decided yet.
 - The connection string is resolved when a DbContext is first created, not at startup; a host starts without a database.
@@ -57,3 +65,4 @@ Show, with the smallest possible code, how a module is laid out, registered, per
 ## Last verified
 - Verified against main at 3e8a598 (T-005 branch point), 2026-10-26
 - Outbox/inbox sections verified on the T-007 branch (based on c632934), 2026-11-02
+- HTTP sections verified on the T-008a branch (based on 84558cc), 2026-11-03

@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using TalepPazari.IntegrationTests.Support;
 using TalepPazari.Modules.Example.Contracts.IntegrationEvents;
 
@@ -27,7 +29,7 @@ public sealed class OutboxAtomicityTests(PostgresFixture postgres)
         await using var host = await ExampleTestHost.CreateAsync(postgres);
         await host.ExecuteAsync(FailingInsertTrigger("OutboxMessages"));
 
-        await Assert.ThrowsAnyAsync<Exception>(() => host.CreateItemAsync());
+        await AssertSimulatedInsertFailureAsync(host);
 
         Assert.Equal(0, await host.CountAsync("ExampleItems"));
         Assert.Equal(0, await host.CountAsync("OutboxMessages"));
@@ -39,10 +41,20 @@ public sealed class OutboxAtomicityTests(PostgresFixture postgres)
         await using var host = await ExampleTestHost.CreateAsync(postgres);
         await host.ExecuteAsync(FailingInsertTrigger("ExampleItems"));
 
-        await Assert.ThrowsAnyAsync<Exception>(() => host.CreateItemAsync());
+        await AssertSimulatedInsertFailureAsync(host);
 
         Assert.Equal(0, await host.CountAsync("ExampleItems"));
         Assert.Equal(0, await host.CountAsync("OutboxMessages"));
+    }
+
+    // Only the trigger's own error counts. A validation failure, a failed assertion inside CreateItemAsync
+    // or a connection error would be a different exception and fail the test.
+    private static async Task AssertSimulatedInsertFailureAsync(ExampleTestHost host)
+    {
+        var exception = await Assert.ThrowsAsync<DbUpdateException>(() => host.CreateItemAsync());
+        var postgresException = Assert.IsType<PostgresException>(exception.InnerException);
+        Assert.Equal(PostgresErrorCodes.RaiseException, postgresException.SqlState);
+        Assert.Equal("simulated insert failure", postgresException.MessageText);
     }
 
     // Test-only trigger that makes every insert into one table fail inside the transaction.

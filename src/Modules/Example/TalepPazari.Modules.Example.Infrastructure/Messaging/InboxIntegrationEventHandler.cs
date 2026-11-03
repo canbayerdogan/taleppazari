@@ -19,12 +19,19 @@ internal sealed class InboxIntegrationEventHandler<TEvent>(
 
     public async Task HandleAsync(TEvent integrationEvent, CancellationToken cancellationToken)
     {
+        // An unset context would give every message the same inbox key and silently skip all but the first.
+        if (context.MessageId == Guid.Empty)
+        {
+            throw new InvalidOperationException(
+                "The integration event context has no message id; handlers must run through the outbox dispatcher.");
+        }
+
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         var inserted = await dbContext.Database.ExecuteSqlAsync($"""
             INSERT INTO example."InboxMessages" ("MessageId", "HandlerName", "ProcessedAt")
             VALUES ({context.MessageId}, {handlerName}, {timeProvider.GetUtcNow()})
-            ON CONFLICT DO NOTHING
+            ON CONFLICT ("MessageId", "HandlerName") DO NOTHING
             """, cancellationToken);
         if (inserted == 0)
         {

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using TalepPazari.IntegrationTests.Support;
 using TalepPazari.Modules.Example.Contracts.IntegrationEvents;
 using TalepPazari.SharedKernel.Messaging;
@@ -42,7 +43,9 @@ public sealed class OutboxConcurrencyTests(PostgresFixture postgres)
         await using var second = ExampleTestHost.Create(first.ConnectionString, first.Clock, AddRecorder, settings);
         await CreateItemsAsync(first);
 
-        var passes = await Task.WhenAll(DrainAsync(first), DrainAsync(second));
+        // Whether both dispatchers get work is timing-dependent and not asserted; row skipping under a
+        // held lock is proven deterministically by A_claim_skips_rows_locked_by_another_transaction_without_waiting.
+        await Task.WhenAll(DrainAsync(first), DrainAsync(second));
 
         // The recording handler has no inbox, so any concurrent or repeated delivery would show up here.
         Assert.Equal(MessageCount, log.Deliveries.Count);
@@ -50,7 +53,68 @@ public sealed class OutboxConcurrencyTests(PostgresFixture postgres)
         Assert.Equal(MessageCount, await first.CountAsync("ExampleItemCreatedReceipts"));
         Assert.Equal(MessageCount, await first.ScalarAsync<long>(
             "SELECT count(*) FROM example.\"OutboxMessages\" WHERE \"ProcessedAt\" IS NOT NULL AND \"Attempts\" = 1"));
-        Assert.All(passes, claimed => Assert.True(claimed > 0, "both dispatchers took part"));
+    }
+
+    [Fact]
+    public async Task A_claim_skips_rows_locked_by_another_transaction_without_waiting()
+    {
+        await using var host = await ExampleTestHost.CreateAsync(postgres);
+        for (var index = 0; index < 20; index++)
+        {
+            await host.CreateItemAsync($"item {index}");
+        }
+
+        var allIds = await ReadIdsAsync(host.ConnectionString, "SELECT \"Id\" FROM example.\"OutboxMessages\"", transaction: null);
+        HashSet<Guid> lockedIds;
+        HashSet<Guid> firstClaim;
+
+        // Another transaction (for example, a dispatcher in the middle of its claim) holds row locks on 5 due rows.
+        var locker = new NpgsqlConnection(host.ConnectionString);
+        await locker.OpenAsync(TestContext.Current.CancellationToken);
+        var lockTransaction = await locker.BeginTransactionAsync(TestContext.Current.CancellationToken);
+        try
+        {
+            lockedIds = await ReadIdsAsync(
+                locker, "SELECT \"Id\" FROM example.\"OutboxMessages\" ORDER BY \"Id\" LIMIT 5 FOR UPDATE", lockTransaction);
+            Assert.Equal(5, lockedIds.Count);
+
+            // Without SKIP LOCKED this claim would block on the locked rows until the timeout cancels it.
+            using var noWaiting = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            noWaiting.CancelAfter(TimeSpan.FromSeconds(5));
+            firstClaim = (await host.ClaimAsync(Guid.CreateVersion7(), 100, noWaiting.Token)).Select(message => message.Id).ToHashSet();
+        }
+        finally
+        {
+            await lockTransaction.RollbackAsync(TestContext.Current.CancellationToken);
+            await lockTransaction.DisposeAsync();
+            await locker.DisposeAsync();
+        }
+
+        Assert.Equal(allIds.Except(lockedIds).ToHashSet(), firstClaim);
+
+        // Released: the skipped rows were claim-eligible all along, and now exactly they are claimed.
+        var secondClaim = (await host.ClaimAsync(Guid.CreateVersion7(), 100)).Select(message => message.Id).ToHashSet();
+        Assert.Equal(lockedIds, secondClaim);
+    }
+
+    private static async Task<HashSet<Guid>> ReadIdsAsync(string connectionString, string sql, NpgsqlTransaction? transaction)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        return await ReadIdsAsync(connection, sql, transaction);
+    }
+
+    private static async Task<HashSet<Guid>> ReadIdsAsync(NpgsqlConnection connection, string sql, NpgsqlTransaction? transaction)
+    {
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+        var ids = new HashSet<Guid>();
+        while (await reader.ReadAsync(TestContext.Current.CancellationToken))
+        {
+            ids.Add(reader.GetGuid(0));
+        }
+
+        return ids;
     }
 
     private static async Task CreateItemsAsync(ExampleTestHost host)

@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using TalepPazari.Modules.Example.Application.ExampleItems.CreateExampleItem;
+using TalepPazari.Modules.Example.Application.ExampleItems.ListExampleItems;
 using TalepPazari.Modules.Example.Application.ExampleItems.RecordExampleItemCreatedReceipt;
 
 namespace TalepPazari.Modules.Example.Application;
@@ -16,6 +17,8 @@ public static class ExampleApplicationRegistration
     {
         services.AddSingleton<IValidator<CreateExampleItemCommand>, CreateExampleItemValidator>();
         services.AddScoped<CreateExampleItemHandler>();
+        services.AddSingleton<IValidator<ListExampleItemsQuery>, ListExampleItemsValidator>();
+        services.AddScoped<ListExampleItemsHandler>();
 
         // Registered as the concrete type only. Infrastructure exposes it as
         // IIntegrationEventHandler<ExampleItemCreatedV1> behind the inbox decorator.

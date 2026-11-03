@@ -54,12 +54,15 @@ Run from the repository root. Requires the .NET SDK pinned in `global.json` (10.
 - Restore: `dotnet restore TalepPazari.slnx`
 - Build: `dotnet build TalepPazari.slnx` (warnings are errors; the build must stay at zero warnings)
 - Run Api: `dotnet run --project src/Hosts/TalepPazari.Api` (listens on `http://localhost:5080`, set in `Properties/launchSettings.json`)
-- Liveness check: `curl -i http://localhost:5080/health/live` (expects `200 Healthy`; placeholder until T-008)
+- Liveness check: `curl -i http://localhost:5080/health/live` (expects `200 Healthy`; placeholder until T-008b)
+- OpenAPI document (Development only): `curl http://localhost:5080/openapi/v1.json`
 - Run Worker: `dotnet run --project src/Hosts/TalepPazari.Worker` (logs `Worker started`, then runs the outbox dispatcher; settings in the `Outbox` section of its `appsettings.json`; Ctrl+C to stop)
 - Test: `dotnet test TalepPazari.slnx` (builds every project under `src/` first; architecture tests need no database, Docker or network)
 - One test class: `dotnet test TalepPazari.slnx --filter "FullyQualifiedName~ModuleReferenceTests"`
 - Integration tests only: `dotnet test tests/TalepPazari.IntegrationTests`. They need Docker: Testcontainers starts a throwaway `postgis/postgis:18-3.6` container (same image as `compose.yaml`) and gives each test its own database, so local data is never touched. Without Docker they are skipped with a message, and the rest of `dotnet test` still runs.
-- Force the integration tests (fail instead of skip when Docker is missing; CI uses this): set `TALEPPAZARI_REQUIRE_DOCKER=true` first (PowerShell `$env:TALEPPAZARI_REQUIRE_DOCKER = 'true'`, bash `TALEPPAZARI_REQUIRE_DOCKER=true dotnet test ...`)
+- Force the integration tests (fail instead of skip when Docker is missing; this is the mode CI will use once T-009 wires it): set `TALEPPAZARI_REQUIRE_DOCKER=true` first (PowerShell `$env:TALEPPAZARI_REQUIRE_DOCKER = 'true'`, bash `TALEPPAZARI_REQUIRE_DOCKER=true dotnet test ...`)
+- Api tests only: `dotnet test tests/TalepPazari.ApiTests`. They start the real Api host in memory (`WebApplicationFactory`). Pagination tests need Docker (per-class PostgreSQL fixture, same skip/`TALEPPAZARI_REQUIRE_DOCKER` rule); every other Api test runs and passes without Docker.
+- OpenAPI snapshot, deliberate update (local only, refused when `CI=true`): set `TALEPPAZARI_UPDATE_SNAPSHOTS=true`, run `dotnet test tests/TalepPazari.ApiTests --filter "FullyQualifiedName~OpenApiSnapshotTests"`, unset it, review and commit the diff of `tests/TalepPazari.ApiTests/Snapshots/openapi-v1.json`. On a mismatch the test writes `openapi-v1.received.json` to its output directory.
 - Architecture tests (`tests/TalepPazari.ArchitectureTests`) discover modules by the `TalepPazari.Modules.<Name>.<Layer>` convention; a new module needs no test change. A failure message names the rule and the offending project or type.
 
 Local database (PostgreSQL 18 + PostGIS, Docker Compose; details in README "Local development"):
@@ -73,7 +76,7 @@ Connection string and migrations (details in `docs/module-template/how-to-add-a-
 - Restore local tools (pinned `dotnet-ef`): `dotnet tool restore`
 - Connection string, once per machine (both hosts share one `UserSecretsId`; values from your `.env`): `dotnet user-secrets set "ConnectionStrings:Default" "Host=127.0.0.1;Port=<POSTGRES_PORT>;Database=<POSTGRES_DB>;Username=<POSTGRES_USER>;Password=<POSTGRES_PASSWORD>" --project src/Hosts/TalepPazari.Api`
 - Apply a module's migrations (explicit only, never at startup): `dotnet ef database update --project src/Modules/<Name>/TalepPazari.Modules.<Name>.Infrastructure --startup-project src/Hosts/TalepPazari.Api --context <Name>DbContext`
-- Example module: `<Name>` = `Example`; endpoint `POST http://localhost:5080/api/v1/example/items` with body `{"name":"..."}`
+- Example module: `<Name>` = `Example`; endpoints `POST http://localhost:5080/api/v1/example/items` with body `{"name":"..."}` and `GET http://localhost:5080/api/v1/example/items?limit=20&cursor=<nextCursor>`
 
 ## Map
 - `SUMMARY.md`: product and architecture overview
@@ -85,3 +88,5 @@ Connection string and migrations (details in `docs/module-template/how-to-add-a-
 - `docs/module-template/how-to-add-a-module.md`: checklist for adding a module (`src/Modules/Example` is the reference), including the outbox/inbox pattern
 - `src/Shared/TalepPazari.SharedKernel/Messaging/`: outbox, inbox and unit-of-work abstractions; `src/Hosts/TalepPazari.Worker/Outbox/`: the dispatcher
 - `tests/TalepPazari.IntegrationTests/`: PostgreSQL integration tests (Testcontainers)
+- `docs/architecture/api-conventions.md`: routes and versioning, problem details, validation messages, cursor pagination, OpenAPI snapshot
+- `tests/TalepPazari.ApiTests/`: HTTP tests against the in-memory Api host, including the OpenAPI snapshot

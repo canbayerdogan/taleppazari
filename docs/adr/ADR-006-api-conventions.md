@@ -1,6 +1,6 @@
 # ADR-006 — API conventions
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-22
 - **Deciders:** project owner
 

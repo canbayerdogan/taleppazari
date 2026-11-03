@@ -89,12 +89,18 @@ src/Modules/<Name>/
 - [ ] Table and column names use default EF Core naming for now; in `psql` they need double quotes (`<schema>."Items"`).
 
 ## 5. Api
-- [ ] `public static class <Name>Endpoints` with `Map<Name>Endpoints(this IEndpointRouteBuilder)`. Route prefix `/api/v1/<schema>` (T-008 owns the final convention).
+Conventions: [`docs/architecture/api-conventions.md`](../architecture/api-conventions.md) (routes, problem details, validation messages, pagination, OpenAPI).
+
+- [ ] `public static class <Name>Endpoints` with `Map<Name>Endpoints(this IEndpointRouteBuilder)`. The host passes its `/api/v1` route group; the module adds only its own prefix: `endpoints.MapGroup("/<schema>").WithTags("<Name>")`. Never write `/api/v1` in a module.
+- [ ] Give every endpoint an operation name: `.WithName("<Verb><Entity>")`.
 - [ ] Request and response records (for example `Create<Entity>Request`, `<Entity>Response`) live in the Api project as `internal sealed record`s. Application types are not the HTTP contract.
-- [ ] Endpoints only translate HTTP to the use case and back: map the request to the command, then success → `TypedResults.Created(...)` / `Ok(...)` with the response record, validation failure → `TypedResults.ValidationProblem(errors)`. No business rules.
+- [ ] Endpoints only translate HTTP to the use case and back: map the request to the command, then success → `TypedResults.Created(...)` / `Ok(...)` with the response record, validation failure → `TypedResults.ValidationProblem(errors)`. No business rules. Every other error (bad JSON, unknown route, unhandled exception) becomes problem details in the host; do not catch exceptions in endpoints to build error responses.
+- [ ] Validation messages are fixed English (the host disables FluentValidation's language manager). Write custom `.WithMessage(...)` texts in English.
+- [ ] List endpoints use cursor pagination (copy `ListExampleItems` from Example): `?limit=` (default 20, max 100, out of range → 400) and `?cursor=` (opaque, invalid → 400), response `{ items, nextCursor }`, keyset query `"Id" > last ORDER BY "Id"` in an Infrastructure `I<Entity>Queries` implementation. Copy the cursor codec into your module's Application until it moves to a shared place.
+- [ ] A new or changed endpoint changes the OpenAPI document: update the snapshot deliberately (see the conventions page) and call it out in the PR.
 
 ## 6. Register in the hosts
-- [ ] `src/Hosts/TalepPazari.Api`: reference `<Name>.Infrastructure` and `<Name>.Api`; in `Program.cs` call `builder.Services.Add<Name>Module(builder.Configuration);` and `app.Map<Name>Endpoints();`.
+- [ ] `src/Hosts/TalepPazari.Api`: reference `<Name>.Infrastructure` and `<Name>.Api`; in `Program.cs` call `builder.Services.Add<Name>Module(builder.Configuration);` and `v1.Map<Name>Endpoints();` (on the existing `/api/v1` route group, not on `app`).
 - [ ] `src/Hosts/TalepPazari.Worker`: reference `<Name>.Infrastructure`; call `builder.Services.Add<Name>Module(builder.Configuration);`.
 - [ ] Hosts reference module `Infrastructure` and `Api` projects for composition only. No `IModule` interface; one explicit call per module.
 
@@ -120,11 +126,13 @@ Integration events use a per-module outbox and inbox (ADR-003). The Worker host'
 - [ ] **Infrastructure pieces**, all `internal`, registered in `Add<Name>Module` (copy from `ExampleModule`):
   - `<Name>UnitOfWork : IUnitOfWork` and `<Name>Outbox : IOutbox`, keyed with `<Name>ApplicationRegistration.ServiceKey`.
   - `<Name>IntegrationEventTypes : IIntegrationEventTypes` listing every event the module publishes (singleton). The outbox refuses unlisted types; the dispatcher dead-letters stored names no registry knows.
-  - `<Name>OutboxStore : IOutboxStore` (scoped). Every time value is a parameter from the dispatcher's `TimeProvider`; never use the database `now()`.
-  - `InboxIntegrationEventHandler<TEvent>`: every `IIntegrationEventHandler<T>` the module consumes is registered **only** through it (`AddInboxHandler<TEvent, THandler>`). The inbox key is the handler's full type name including namespace, so renaming a handler class makes already-handled messages look new.
+  - `<Name>OutboxStore : IOutboxStore` (scoped). Every time value is a parameter from the dispatcher's `TimeProvider`; never use the database `now()`. Every `Mark*` statement must require the claim token **and** `"ProcessedAt" IS NULL AND "DeadLetteredAt" IS NULL`, so a finished row is never changed again (see `ExampleOutboxStore`).
+  - `InboxIntegrationEventHandler<TEvent>`: every `IIntegrationEventHandler<T>` the module consumes is registered **only** through it (`AddInboxHandler<TEvent, THandler>`). The inbox key is the handler's full type name including namespace, so renaming a handler class makes already-handled messages look new. The decorator refuses a message without an id (an unset event context), and its insert names the key: `ON CONFLICT ("MessageId", "HandlerName") DO NOTHING`.
 - [ ] **Consuming** another module's event: reference its `Contracts` project, implement `IIntegrationEventHandler<TheirEventV1>` in your Application, and register it behind **your** module's inbox decorator. The inbox row and your effect commit in one transaction in your schema.
 - [ ] **Delivery is at-least-once.** A message is retried as a whole when any handler fails (handlers that already succeeded are skipped by the inbox); at `Outbox:MaxAttempts` it is dead-lettered for all handlers. Event ordering and outbox/inbox retention are not decided (ADR-003 Open): do not rely on either.
 - [ ] **Lease:** the Worker claims `Outbox:BatchSize` messages per module under one lease of `Outbox:LeaseDuration` and handles them one after another. Keep `BatchSize × worst-case handler time` below `LeaseDuration`, or another Worker may deliver the same messages again (harmless because of the inbox, but wasted work).
+- [ ] **Errors and logs carry no data.** An exception message may contain event or personal data, so `LastError` stores only the exception type name (other dead-letter reasons are fixed text plus type names). Warning and Error log entries carry the exception type, the message id or module name and a fixed hint, never the exception message or the exception object. The full exception is logged at Debug only; to see it, set the Worker's `Logging:LogLevel` entry for the category `TalepPazari.Worker.Outbox` to `Debug` (for example `"TalepPazari.Worker.Outbox": "Debug"` under `Logging:LogLevel` in a local configuration file or user secrets).
+- [ ] **Known limits** (accepted for now, to revisit with the deployment target): a shutdown or a failed result write in the middle of a batch leaves the remaining claimed messages with their incremented `Attempts` and their lease until it expires. Frequent interruptions (restarts, database blips) can therefore dead-letter a healthy message at `Outbox:MaxAttempts`.
 - [ ] **Facades** (synchronous calls from other modules, preferably read-only queries): the interface and its DTOs go in `Contracts` (for example `Contracts/I<Name>Queries.cs`); the implementation is `internal` in Infrastructure or Application and registered in `Add<Name>Module`. Add one only when a consumer exists.
 - [ ] Consuming another module: reference only its `Contracts` project.
 
@@ -133,4 +141,5 @@ Integration events use a per-module outbox and inbox (ADR-003). The Worker host'
 - [ ] `dotnet run --project src/Hosts/TalepPazari.Api`, then call the endpoint with `curl.exe`. If your environment uses an HTTP proxy, add `--noproxy localhost` to `curl.exe`.
 - [ ] With the database stopped (`docker compose stop`), `dotnet run --project src/Hosts/TalepPazari.Worker` still logs `Worker started`, then logs failed outbox passes and backs off without stopping.
 - [ ] Integration tests for the module's outbox and handlers go in `tests/TalepPazari.IntegrationTests` (see AGENTS.md "Commands").
+- [ ] HTTP tests (status codes, problem details, pagination) go in `tests/TalepPazari.ApiTests`, which starts the real Api host in memory (`TestApi`). Tests that need PostgreSQL use `IClassFixture<PostgresFixture>`; all others must run without Docker.
 - [ ] Update `CONTEXT.md` and the generated maps if present.
