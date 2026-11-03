@@ -30,7 +30,6 @@ public sealed class ValidationCultureTests
         {
             await using var api = TestApi.Create();
             using var response = await api.Client.PostAsJsonAsync(
-            var response = await api.Client.PostAsJsonAsync(
                 "/api/v1/example/items", new { name = "" }, TestContext.Current.CancellationToken);
 
             var problem = await ProblemAssert.HasShapeAsync(response, 400, withErrors: true);

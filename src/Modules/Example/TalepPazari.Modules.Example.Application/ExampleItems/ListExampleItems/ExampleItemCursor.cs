@@ -37,27 +37,17 @@ internal static class ExampleItemCursor
         Span<byte> bytes = stackalloc byte[ByteLength];
         var status = Base64Url.DecodeFromChars(cursor, bytes, out var consumed, out var written, isFinalBlock: true);
         if (status != OperationStatus.Done || consumed != cursor.Length || written != ByteLength || bytes[0] != FormatVersion)
-    public static bool TryDecode(string? cursor, out Guid lastId)
-    {
-        lastId = Guid.Empty;
-        if (string.IsNullOrEmpty(cursor) || Base64Url.GetMaxDecodedLength(cursor.Length) > 64)
         {
             return false;
         }
 
         var id = new Guid(bytes[1..], bigEndian: true);
         if (id == Guid.Empty || !string.Equals(Encode(id), cursor, StringComparison.Ordinal))
-        Span<byte> bytes = stackalloc byte[64];
-        if (!Base64Url.TryDecodeFromChars(cursor, bytes, out var written)
-            || written != ByteLength
-            || bytes[0] != FormatVersion)
         {
             return false;
         }
 
         lastId = id;
         return true;
-        lastId = new Guid(bytes[1..ByteLength], bigEndian: true);
-        return lastId != Guid.Empty;
     }
 }
