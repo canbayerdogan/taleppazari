@@ -115,6 +115,7 @@ public sealed class PaginationTests(PostgresFixture postgres) : IClassFixture<Po
         {
             clock.Advance(TimeSpan.FromMilliseconds(1));
             using var response = await api.Client.PostAsJsonAsync(
+            var response = await api.Client.PostAsJsonAsync(
                 ItemsRoute, new { name = $"item-{index}" }, TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.Created, response.StatusCode);
             var item = await response.Content.ReadFromJsonAsync<ItemDto>(TestContext.Current.CancellationToken);
@@ -127,6 +128,7 @@ public sealed class PaginationTests(PostgresFixture postgres) : IClassFixture<Po
     private static async Task<PageDto> GetPageAsync(TestApi api, string url)
     {
         using var response = await api.Client.GetAsync(url, TestContext.Current.CancellationToken);
+        var response = await api.Client.GetAsync(url, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return (await response.Content.ReadFromJsonAsync<PageDto>(TestContext.Current.CancellationToken))!;
     }
