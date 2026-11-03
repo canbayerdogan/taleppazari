@@ -12,7 +12,6 @@ namespace TalepPazari.ApiTests.Snapshots;
 // the source tree). Deliberate update, locally only: set TALEPPAZARI_UPDATE_SNAPSHOTS=true, run this test
 // (it rewrites Snapshots/openapi-v1.json and reports itself as skipped), review the diff and commit it.
 // With CI=true or CI=1 (any case) the update is refused.
-// With CI=true the update is refused.
 public sealed class OpenApiSnapshotTests
 {
     public const string UpdateVariable = "TALEPPAZARI_UPDATE_SNAPSHOTS";
@@ -26,7 +25,6 @@ public sealed class OpenApiSnapshotTests
         if (IsTrue(UpdateVariable))
         {
             Assert.False(IsCi(), $"{UpdateVariable} is refused when CI is set (true or 1): snapshots are updated locally and reviewed.");
-            Assert.False(IsTrue("CI"), $"{UpdateVariable} is refused when CI=true: snapshots are updated locally and reviewed.");
             await File.WriteAllTextAsync(SourceSnapshotPath(), actual, TestContext.Current.CancellationToken);
             Assert.Skip($"{SnapshotName} was rewritten because {UpdateVariable}=true. Review the diff, commit it, and run again without the variable.");
         }

@@ -35,7 +35,6 @@ public sealed class PaginationValidationTests
         await using var api = TestApi.Create();
 
         using var response = await api.Client.GetAsync($"{ItemsRoute}?limit={limit}", TestContext.Current.CancellationToken);
-        var response = await api.Client.GetAsync($"{ItemsRoute}?limit={limit}", TestContext.Current.CancellationToken);
 
         var problem = await ProblemAssert.HasShapeAsync(response, 400, withErrors: true);
         Assert.True(problem.GetProperty("errors").TryGetProperty("Limit", out _));
@@ -52,19 +51,5 @@ public sealed class PaginationValidationTests
 
         var problem = await ProblemAssert.HasShapeAsync(response, 400, withErrors: true);
         Assert.True(problem.GetProperty("errors").TryGetProperty("Cursor", out _), reason);
-    [InlineData("not-a-cursor")]
-    [InlineData("AQ")] // version byte only
-    [InlineData("AgAAAAAAAAAAAAAAAAAAAAE")] // unknown format version 2
-    [InlineData("AQAAAAAAAAAAAAAAAAAAAAA")] // version 1, empty id
-    [InlineData("AQAAAAAAAAAAAAAAAAAAAAAB")] // one byte too long
-    [InlineData("%20")]
-    public async Task Invalid_cursor_returns_400_problem(string cursor)
-    {
-        await using var api = TestApi.Create();
-
-        var response = await api.Client.GetAsync($"{ItemsRoute}?cursor={cursor}", TestContext.Current.CancellationToken);
-
-        var problem = await ProblemAssert.HasShapeAsync(response, 400, withErrors: true);
-        Assert.True(problem.GetProperty("errors").TryGetProperty("Cursor", out _));
     }
 }

@@ -15,7 +15,6 @@ public static class ProblemAssert
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         using var document = JsonDocument.Parse(body);
         var root = document.RootElement.Clone();
-        var root = JsonDocument.Parse(body).RootElement.Clone();
 
         string[] expected = withErrors ? [.. BaseMembers, "errors"] : BaseMembers;
         var actual = root.EnumerateObject().Select(member => member.Name).Order(StringComparer.Ordinal);
