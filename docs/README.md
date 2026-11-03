@@ -5,6 +5,7 @@
 | `roadmap.md` | Four phases, exit criteria, post-MVP backlog |
 | `repo-setup-checklist.md` | Manual GitHub settings for the repository owner |
 | `adr/` | Architecture Decision Records (`Proposed` until the owner accepts them) |
+| `architecture/` | How accepted decisions are implemented: `api-conventions.md` (routes, problem details, pagination, OpenAPI) |
 | `agent-tasks/` | Task briefs T-XXX and the status table |
 | `templates/` | ADR, task brief, module CONTEXT and task report templates |
 | `domain/` | Glossary, entities, state machines, invariants (added per phase) |
