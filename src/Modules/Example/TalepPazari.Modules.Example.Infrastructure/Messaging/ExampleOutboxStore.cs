@@ -6,6 +6,7 @@ namespace TalepPazari.Modules.Example.Infrastructure.Messaging;
 
 // Every time value is a parameter from the dispatcher's TimeProvider; no statement uses now().
 // Each statement runs in its own implicit transaction; no transaction stays open while handlers run.
+// Every Mark* statement requires the claim token and a row that is neither processed nor dead-lettered.
 internal sealed class ExampleOutboxStore(ExampleDbContext dbContext) : IOutboxStore
 {
     public string ModuleName => "Example";
@@ -45,6 +46,7 @@ internal sealed class ExampleOutboxStore(ExampleDbContext dbContext) : IOutboxSt
             UPDATE example."OutboxMessages"
             SET "ProcessedAt" = {now}, "LockedUntil" = NULL, "LockedBy" = NULL
             WHERE "Id" = {messageId} AND "LockedBy" = {claimToken}
+              AND "ProcessedAt" IS NULL AND "DeadLetteredAt" IS NULL
             """, cancellationToken) == 1;
 
     public async Task<bool> MarkFailedAsync(
@@ -53,6 +55,7 @@ internal sealed class ExampleOutboxStore(ExampleDbContext dbContext) : IOutboxSt
             UPDATE example."OutboxMessages"
             SET "NextAttemptAt" = {nextAttemptAt}, "LastError" = {Truncate(error)}, "LockedUntil" = NULL, "LockedBy" = NULL
             WHERE "Id" = {messageId} AND "LockedBy" = {claimToken}
+              AND "ProcessedAt" IS NULL AND "DeadLetteredAt" IS NULL
             """, cancellationToken) == 1;
 
     public async Task<bool> MarkDeadLetteredAsync(
@@ -61,6 +64,7 @@ internal sealed class ExampleOutboxStore(ExampleDbContext dbContext) : IOutboxSt
             UPDATE example."OutboxMessages"
             SET "DeadLetteredAt" = {now}, "LastError" = {Truncate(error)}, "LockedUntil" = NULL, "LockedBy" = NULL
             WHERE "Id" = {messageId} AND "LockedBy" = {claimToken}
+              AND "ProcessedAt" IS NULL AND "DeadLetteredAt" IS NULL
             """, cancellationToken) == 1;
 
     private static string Truncate(string error) =>

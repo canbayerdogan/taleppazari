@@ -7,10 +7,12 @@ namespace TalepPazari.IntegrationTests.Support;
 
 // Test-only handlers, registered without the inbox decorator so they see every delivery.
 
+// Its exception message contains event data (the item id), as a careless real handler's might;
+// tests check that this message never reaches LastError or a Warning/Error log entry.
 public sealed class ThrowingHandler : IIntegrationEventHandler<ExampleItemCreatedV1>
 {
     public Task HandleAsync(ExampleItemCreatedV1 integrationEvent, CancellationToken cancellationToken) =>
-        throw new InvalidOperationException("Simulated handler failure.");
+        throw new InvalidOperationException($"Simulated handler failure for item {integrationEvent.ItemId}.");
 }
 
 // Records every delivery (message id) in a log shared by all hosts of one test.

@@ -59,7 +59,7 @@ Run from the repository root. Requires the .NET SDK pinned in `global.json` (10.
 - Test: `dotnet test TalepPazari.slnx` (builds every project under `src/` first; architecture tests need no database, Docker or network)
 - One test class: `dotnet test TalepPazari.slnx --filter "FullyQualifiedName~ModuleReferenceTests"`
 - Integration tests only: `dotnet test tests/TalepPazari.IntegrationTests`. They need Docker: Testcontainers starts a throwaway `postgis/postgis:18-3.6` container (same image as `compose.yaml`) and gives each test its own database, so local data is never touched. Without Docker they are skipped with a message, and the rest of `dotnet test` still runs.
-- Force the integration tests (fail instead of skip when Docker is missing; CI uses this): set `TALEPPAZARI_REQUIRE_DOCKER=true` first (PowerShell `$env:TALEPPAZARI_REQUIRE_DOCKER = 'true'`, bash `TALEPPAZARI_REQUIRE_DOCKER=true dotnet test ...`)
+- Force the integration tests (fail instead of skip when Docker is missing; this is the mode CI will use once T-009 wires it): set `TALEPPAZARI_REQUIRE_DOCKER=true` first (PowerShell `$env:TALEPPAZARI_REQUIRE_DOCKER = 'true'`, bash `TALEPPAZARI_REQUIRE_DOCKER=true dotnet test ...`)
 - Architecture tests (`tests/TalepPazari.ArchitectureTests`) discover modules by the `TalepPazari.Modules.<Name>.<Layer>` convention; a new module needs no test change. A failure message names the rule and the offending project or type.
 
 Local database (PostgreSQL 18 + PostGIS, Docker Compose; details in README "Local development"):

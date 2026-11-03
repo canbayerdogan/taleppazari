@@ -66,8 +66,10 @@ public sealed partial class OutboxDispatcher
             }
             catch (Exception exception) when (!(exception is OperationCanceledException && cancellationToken.IsCancellationRequested))
             {
+                // Exception type only at Warning; the full exception (its message may contain data) at Debug.
                 failedStores++;
-                LogStoreFailed(logger, exception, store.ModuleName);
+                LogStoreFailed(logger, store.ModuleName, exception.GetType().FullName!);
+                LogStoreFailedDetail(logger, exception, store.ModuleName);
             }
         }
 
@@ -179,17 +181,18 @@ public sealed partial class OutboxDispatcher
 
     private async Task FailAsync(IOutboxStore store, Guid claimToken, OutboxMessage message, TagList tags, Exception exception)
     {
-        // Exception type and message only; the payload is never stored or logged.
-        var error = $"{exception.GetType().FullName}: {exception.Message}";
+        // Exception type only: an exception message may contain event or personal data, so it is never
+        // stored, and it is logged (with the full exception) at Debug only.
+        var error = exception.GetType().FullName!;
+        LogHandlerFailed(logger, message.Id, error, message.Attempts, options.MaxAttempts);
+        LogHandlerFailedDetail(logger, exception, message.Id);
         if (message.Attempts >= options.MaxAttempts)
         {
-            LogHandlerFailed(logger, exception, message.Attempts, options.MaxAttempts);
             await DeadLetterAsync(store, claimToken, message, tags, error);
             return;
         }
 
         var nextAttemptAt = timeProvider.GetUtcNow() + RetryDelay(message.Attempts);
-        LogHandlerFailed(logger, exception, message.Attempts, options.MaxAttempts);
         if (await RecordAsync(token => store.MarkFailedAsync(message.Id, claimToken, error, nextAttemptAt, token)))
         {
             OutboxTelemetry.Failed.Add(1, tags);
@@ -200,7 +203,7 @@ public sealed partial class OutboxDispatcher
     {
         if (await RecordAsync(token => store.MarkDeadLetteredAsync(message.Id, claimToken, reason, timeProvider.GetUtcNow(), token)))
         {
-            LogDeadLettered(logger, message.Attempts, reason);
+            LogDeadLettered(logger, message.Id, message.Attempts, reason);
             OutboxTelemetry.DeadLettered.Add(1, tags);
         }
     }
@@ -236,14 +239,22 @@ public sealed partial class OutboxDispatcher
     private static EventInvoker CreateInvoker(Type eventType) =>
         (EventInvoker)Activator.CreateInstance(typeof(EventInvoker<>).MakeGenericType(eventType))!;
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Outbox pass for module {Module} failed; retrying after back-off")]
-    private static partial void LogStoreFailed(ILogger logger, Exception exception, string module);
+    // Warning and Error entries carry no exception object and no exception message (they may contain data).
+    // The full exception is logged at Debug; enable it with Logging:LogLevel (see the how-to).
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Outbox pass for module {Module} failed with {ExceptionType}; retrying after back-off (is the database reachable? details at Debug)")]
+    private static partial void LogStoreFailed(ILogger logger, string module, string exceptionType);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Handling outbox message failed (attempt {Attempt} of {MaxAttempts})")]
-    private static partial void LogHandlerFailed(ILogger logger, Exception exception, int attempt, int maxAttempts);
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Outbox pass for module {Module} failed")]
+    private static partial void LogStoreFailedDetail(ILogger logger, Exception exception, string module);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Outbox message dead-lettered after {Attempts} attempts: {Reason}")]
-    private static partial void LogDeadLettered(ILogger logger, int attempts, string reason);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Handling outbox message {MessageId} failed with {ExceptionType} (attempt {Attempt} of {MaxAttempts})")]
+    private static partial void LogHandlerFailed(ILogger logger, Guid messageId, string exceptionType, int attempt, int maxAttempts);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Handling outbox message {MessageId} failed")]
+    private static partial void LogHandlerFailedDetail(ILogger logger, Exception exception, Guid messageId);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Outbox message {MessageId} dead-lettered after {Attempts} attempts: {Reason}")]
+    private static partial void LogDeadLettered(ILogger logger, Guid messageId, int attempts, string reason);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Lease lost: another dispatcher owns the outbox message now, so this result was not recorded")]
     private static partial void LogLeaseLost(ILogger logger);
