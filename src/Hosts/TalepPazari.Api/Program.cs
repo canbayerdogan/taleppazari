@@ -12,7 +12,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHealthChecks();
 
-// Every non-success response is RFC 9457 problem details (docs/architecture/api-conventions.md).
+// Every non-success response is RFC 9457 problem details as application/problem+json, whatever the
+// Accept header says (docs/architecture/api-conventions.md). The writer is registered first, so it wins.
+builder.Services.AddSingleton<IProblemDetailsWriter, ProblemJsonWriter>();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 
@@ -30,6 +32,7 @@ var app = builder.Build();
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseMiddleware<ResponseStartedExceptionMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
