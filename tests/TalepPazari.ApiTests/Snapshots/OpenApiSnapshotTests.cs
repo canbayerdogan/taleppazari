@@ -11,6 +11,7 @@ namespace TalepPazari.ApiTests.Snapshots;
 // On a mismatch the test fails and writes openapi-v1.received.json to the test output directory (never into
 // the source tree). Deliberate update, locally only: set TALEPPAZARI_UPDATE_SNAPSHOTS=true, run this test
 // (it rewrites Snapshots/openapi-v1.json and reports itself as skipped), review the diff and commit it.
+// With CI=true or CI=1 (any case) the update is refused.
 // With CI=true the update is refused.
 public sealed class OpenApiSnapshotTests
 {
@@ -24,6 +25,7 @@ public sealed class OpenApiSnapshotTests
 
         if (IsTrue(UpdateVariable))
         {
+            Assert.False(IsCi(), $"{UpdateVariable} is refused when CI is set (true or 1): snapshots are updated locally and reviewed.");
             Assert.False(IsTrue("CI"), $"{UpdateVariable} is refused when CI=true: snapshots are updated locally and reviewed.");
             await File.WriteAllTextAsync(SourceSnapshotPath(), actual, TestContext.Current.CancellationToken);
             Assert.Skip($"{SnapshotName} was rewritten because {UpdateVariable}=true. Review the diff, commit it, and run again without the variable.");
@@ -57,6 +59,10 @@ public sealed class OpenApiSnapshotTests
 
     private static bool IsTrue(string variable) =>
         string.Equals(Environment.GetEnvironmentVariable(variable), "true", StringComparison.OrdinalIgnoreCase);
+
+    // CI systems set CI=true (GitHub Actions) or CI=1 (some others).
+    private static bool IsCi() =>
+        IsTrue("CI") || string.Equals(Environment.GetEnvironmentVariable("CI")?.Trim(), "1", StringComparison.Ordinal);
 
     // The project folder above the test output directory (bin/<configuration>/<framework>/). Not taken from
     // [CallerFilePath], which deterministic CI builds map to a placeholder path.

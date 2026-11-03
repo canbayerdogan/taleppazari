@@ -3,6 +3,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace TalepPazari.Api.ErrorHandling;
 
+// Turns every exception that escapes an endpoint before the response started into a problem-details
+// response. The response never contains the exception message, its type or a stack trace. Logging follows
+// UnhandledExceptionLog. Exceptions after the response started never reach this handler (the framework
+// rethrows them first); ResponseStartedExceptionMiddleware handles those.
+internal sealed class ApiExceptionHandler(IProblemDetailsService problemDetailsService, ILogger<ApiExceptionHandler> logger)
 // Turns every exception that escapes an endpoint into a problem-details response.
 // The response never contains the exception message, its type or a stack trace. Warning and Error logs
 // carry only the exception type and the route template (never the query string or the body); the full
@@ -12,6 +17,7 @@ internal sealed partial class ApiExceptionHandler(IProblemDetailsService problem
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
+        var routeTemplate = UnhandledExceptionLog.RouteTemplateOf(httpContext.Features.Get<IExceptionHandlerFeature>()?.Endpoint);
         var routeTemplate = (httpContext.Features.Get<IExceptionHandlerFeature>()?.Endpoint as RouteEndpoint)?.RoutePattern.RawText
             ?? "(no route)";
 
@@ -20,10 +26,15 @@ internal sealed partial class ApiExceptionHandler(IProblemDetailsService problem
         {
             // A client error (unreadable body, wrong content type, body too large): not a server fault.
             status = badRequest.StatusCode;
+            UnhandledExceptionLog.Details(logger, exception, routeTemplate);
         }
         else
         {
             status = StatusCodes.Status500InternalServerError;
+            UnhandledExceptionLog.Unhandled(logger, exception, routeTemplate);
+        }
+
+        // ProblemJsonWriter accepts every request, so this writes whatever the Accept header says.
             LogUnhandled(exception.GetType().FullName, routeTemplate);
         }
 

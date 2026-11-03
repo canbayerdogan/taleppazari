@@ -13,6 +13,8 @@ public static class ProblemAssert
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
 
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        using var document = JsonDocument.Parse(body);
+        var root = document.RootElement.Clone();
         var root = JsonDocument.Parse(body).RootElement.Clone();
 
         string[] expected = withErrors ? [.. BaseMembers, "errors"] : BaseMembers;

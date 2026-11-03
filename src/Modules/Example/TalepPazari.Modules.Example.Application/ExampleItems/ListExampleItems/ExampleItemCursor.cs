@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Buffers.Text;
 
 namespace TalepPazari.Modules.Example.Application.ExampleItems.ListExampleItems;
@@ -12,6 +13,9 @@ internal static class ExampleItemCursor
     private const byte FormatVersion = 1;
     private const int ByteLength = 17;
 
+    // 17 bytes encode to exactly 23 base64url characters without padding.
+    private static readonly int EncodedLength = Base64Url.GetEncodedLength(ByteLength);
+
     public static string Encode(Guid lastId)
     {
         Span<byte> bytes = stackalloc byte[ByteLength];
@@ -20,6 +24,19 @@ internal static class ExampleItemCursor
         return Base64Url.EncodeToString(bytes);
     }
 
+    // Total: never throws, whatever the input. Accepts only the canonical form Encode produces, so padding,
+    // whitespace, other alphabets, wrong lengths, unknown versions and non-zero unused bits are all invalid.
+    public static bool TryDecode(string? cursor, out Guid lastId)
+    {
+        lastId = Guid.Empty;
+        if (cursor is null || cursor.Length != EncodedLength)
+        {
+            return false;
+        }
+
+        Span<byte> bytes = stackalloc byte[ByteLength];
+        var status = Base64Url.DecodeFromChars(cursor, bytes, out var consumed, out var written, isFinalBlock: true);
+        if (status != OperationStatus.Done || consumed != cursor.Length || written != ByteLength || bytes[0] != FormatVersion)
     public static bool TryDecode(string? cursor, out Guid lastId)
     {
         lastId = Guid.Empty;
@@ -28,6 +45,8 @@ internal static class ExampleItemCursor
             return false;
         }
 
+        var id = new Guid(bytes[1..], bigEndian: true);
+        if (id == Guid.Empty || !string.Equals(Encode(id), cursor, StringComparison.Ordinal))
         Span<byte> bytes = stackalloc byte[64];
         if (!Base64Url.TryDecodeFromChars(cursor, bytes, out var written)
             || written != ByteLength
@@ -36,6 +55,8 @@ internal static class ExampleItemCursor
             return false;
         }
 
+        lastId = id;
+        return true;
         lastId = new Guid(bytes[1..ByteLength], bigEndian: true);
         return lastId != Guid.Empty;
     }
