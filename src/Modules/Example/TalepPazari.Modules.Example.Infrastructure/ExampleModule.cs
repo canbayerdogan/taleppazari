@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using TalepPazari.Modules.Example.Application;
 using TalepPazari.Modules.Example.Application.ExampleItems;
+using TalepPazari.Modules.Example.Application.ExampleItems.ListExampleItems;
 using TalepPazari.Modules.Example.Application.ExampleItems.RecordExampleItemCreatedReceipt;
 using TalepPazari.Modules.Example.Contracts.IntegrationEvents;
 using TalepPazari.Modules.Example.Infrastructure.Messaging;
@@ -34,6 +35,7 @@ public static class ExampleModule
         });
 
         services.AddScoped<IExampleItemRepository, ExampleItemRepository>();
+        services.AddScoped<IExampleItemQueries, ExampleItemQueries>();
         services.AddScoped<IExampleItemCreatedReceiptRepository, ExampleItemCreatedReceiptRepository>();
 
         // Unit of work and outbox: keyed, because every module implements the same SharedKernel interfaces.

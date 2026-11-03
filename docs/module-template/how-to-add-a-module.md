@@ -89,12 +89,18 @@ src/Modules/<Name>/
 - [ ] Table and column names use default EF Core naming for now; in `psql` they need double quotes (`<schema>."Items"`).
 
 ## 5. Api
-- [ ] `public static class <Name>Endpoints` with `Map<Name>Endpoints(this IEndpointRouteBuilder)`. Route prefix `/api/v1/<schema>` (T-008 owns the final convention).
+Conventions: [`docs/architecture/api-conventions.md`](../architecture/api-conventions.md) (routes, problem details, validation messages, pagination, OpenAPI).
+
+- [ ] `public static class <Name>Endpoints` with `Map<Name>Endpoints(this IEndpointRouteBuilder)`. The host passes its `/api/v1` route group; the module adds only its own prefix: `endpoints.MapGroup("/<schema>").WithTags("<Name>")`. Never write `/api/v1` in a module.
+- [ ] Give every endpoint an operation name: `.WithName("<Verb><Entity>")`.
 - [ ] Request and response records (for example `Create<Entity>Request`, `<Entity>Response`) live in the Api project as `internal sealed record`s. Application types are not the HTTP contract.
-- [ ] Endpoints only translate HTTP to the use case and back: map the request to the command, then success → `TypedResults.Created(...)` / `Ok(...)` with the response record, validation failure → `TypedResults.ValidationProblem(errors)`. No business rules.
+- [ ] Endpoints only translate HTTP to the use case and back: map the request to the command, then success → `TypedResults.Created(...)` / `Ok(...)` with the response record, validation failure → `TypedResults.ValidationProblem(errors)`. No business rules. Every other error (bad JSON, unknown route, unhandled exception) becomes problem details in the host; do not catch exceptions in endpoints to build error responses.
+- [ ] Validation messages are fixed English (the host disables FluentValidation's language manager). Write custom `.WithMessage(...)` texts in English.
+- [ ] List endpoints use cursor pagination (copy `ListExampleItems` from Example): `?limit=` (default 20, max 100, out of range → 400) and `?cursor=` (opaque, invalid → 400), response `{ items, nextCursor }`, keyset query `"Id" > last ORDER BY "Id"` in an Infrastructure `I<Entity>Queries` implementation. Copy the cursor codec into your module's Application until it moves to a shared place.
+- [ ] A new or changed endpoint changes the OpenAPI document: update the snapshot deliberately (see the conventions page) and call it out in the PR.
 
 ## 6. Register in the hosts
-- [ ] `src/Hosts/TalepPazari.Api`: reference `<Name>.Infrastructure` and `<Name>.Api`; in `Program.cs` call `builder.Services.Add<Name>Module(builder.Configuration);` and `app.Map<Name>Endpoints();`.
+- [ ] `src/Hosts/TalepPazari.Api`: reference `<Name>.Infrastructure` and `<Name>.Api`; in `Program.cs` call `builder.Services.Add<Name>Module(builder.Configuration);` and `v1.Map<Name>Endpoints();` (on the existing `/api/v1` route group, not on `app`).
 - [ ] `src/Hosts/TalepPazari.Worker`: reference `<Name>.Infrastructure`; call `builder.Services.Add<Name>Module(builder.Configuration);`.
 - [ ] Hosts reference module `Infrastructure` and `Api` projects for composition only. No `IModule` interface; one explicit call per module.
 
@@ -135,4 +141,5 @@ Integration events use a per-module outbox and inbox (ADR-003). The Worker host'
 - [ ] `dotnet run --project src/Hosts/TalepPazari.Api`, then call the endpoint with `curl.exe`. If your environment uses an HTTP proxy, add `--noproxy localhost` to `curl.exe`.
 - [ ] With the database stopped (`docker compose stop`), `dotnet run --project src/Hosts/TalepPazari.Worker` still logs `Worker started`, then logs failed outbox passes and backs off without stopping.
 - [ ] Integration tests for the module's outbox and handlers go in `tests/TalepPazari.IntegrationTests` (see AGENTS.md "Commands").
+- [ ] HTTP tests (status codes, problem details, pagination) go in `tests/TalepPazari.ApiTests`, which starts the real Api host in memory (`TestApi`). Tests that need PostgreSQL use `IClassFixture<PostgresFixture>`; all others must run without Docker.
 - [ ] Update `CONTEXT.md` and the generated maps if present.
