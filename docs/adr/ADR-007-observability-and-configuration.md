@@ -1,6 +1,6 @@
 # ADR-007 — Observability and configuration
 
-- **Status:** Accepted
+- **Status:** Accepted 2026-11-03
 - **Date:** 2026-10-22
 - **Deciders:** project owner
 
