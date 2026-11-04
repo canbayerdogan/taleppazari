@@ -15,9 +15,10 @@ One brief per task. One task = one branch = one PR. Only the owner merges.
 | T-007 | Outbox/Inbox and event dispatch | T-004, T-005, T-006 | required | done |
 | T-008 | API and observability standards | T-003, T-004, T-005, T-006 | required | split T-008a T-008b |
 | T-008a | api-conventions | T-003, T-004, T-005, T-006 | required | done |
-| T-008a2 | api-conventions | T-008a1-repair-main, T-009 | required | todo |
+| T-008a2 | api-conventions | T-008a1-repair-main, T-009 | required | done |
 | T-008b | observability | T-008a2 | required | todo |
 | T-009 | CI pipeline | T-003 (extend after T-006..T-008) | required | done |
+| T-009b | CI review | T-009 | required | todo |
 | T-010 | Repo map generator | T-005..T-009 | required | todo |
 
 Suggested order: T-005, then T-006, then T-007 and T-008 in parallel, then T-009, then T-010.
