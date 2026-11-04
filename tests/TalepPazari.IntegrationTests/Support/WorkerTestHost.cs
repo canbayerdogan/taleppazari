@@ -35,6 +35,9 @@ public sealed class WorkerTestHost : IAsyncDisposable
         {
             ["ConnectionStrings:Default"] = connectionString,
         };
+
+        // Telemetry is collected but not exported, unless a test sets the key (null means "unset").
+        values.TryAdd("Telemetry:Exporter", "None");
         builder.Configuration.AddInMemoryCollection(values);
         builder.AddWorkerServices();
 

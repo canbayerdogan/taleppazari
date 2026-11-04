@@ -3,11 +3,13 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using TalepPazari.Modules.Example.Application;
 using TalepPazari.Modules.Example.Application.ExampleItems;
 using TalepPazari.Modules.Example.Application.ExampleItems.ListExampleItems;
 using TalepPazari.Modules.Example.Application.ExampleItems.RecordExampleItemCreatedReceipt;
 using TalepPazari.Modules.Example.Contracts.IntegrationEvents;
+using TalepPazari.Modules.Example.Infrastructure.Health;
 using TalepPazari.Modules.Example.Infrastructure.Messaging;
 using TalepPazari.Modules.Example.Infrastructure.Persistence;
 using TalepPazari.SharedKernel.Messaging;
@@ -50,6 +52,17 @@ public static class ExampleModule
         // Consumers: every handler is exposed only through the inbox decorator.
         // IIntegrationEventContext is registered by the dispatcher (Worker host).
         AddInboxHandler<ExampleItemCreatedV1, RecordExampleItemCreatedReceiptHandler>(services);
+
+        // Readiness (ADR-007): the module registers its own check as a HealthCheckRegistration (abstractions only).
+        // The Api host runs every registration on /health/ready; a host without health endpoints ignores it.
+        services.AddSingleton<ExampleReadinessState>();
+        services.AddScoped<ExampleDatabaseHealthCheck>();
+        services.AddSingleton(new HealthCheckRegistration(
+            ExampleDatabaseHealthCheck.Name,
+            provider => provider.GetRequiredService<ExampleDatabaseHealthCheck>(),
+            HealthStatus.Unhealthy,
+            tags: null,
+            ExampleDatabaseHealthCheck.Timeout));
 
         return services;
     }

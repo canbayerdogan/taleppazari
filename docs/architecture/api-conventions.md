@@ -1,6 +1,6 @@
 # API conventions
 
-How every endpoint of the Api host behaves. Decisions come from [ADR-006](../adr/ADR-006-api-conventions.md); this page describes the implementation (T-008a). The `Example` module is the reference. Observability (correlation ID, logging setup, telemetry, health) is T-008b.
+How every endpoint of the Api host behaves. Decisions come from [ADR-006](../adr/ADR-006-api-conventions.md); this page describes the implementation (T-008a). The `Example` module is the reference. Observability (correlation ID, logging, telemetry, health) is described in [observability.md](observability.md) (T-008b).
 
 ## Routes and versioning
 - The Api host owns the version prefix: `Program.cs` creates one route group, `app.MapGroup("/api/v1")`, and passes it to every `Map<Name>Endpoints`. The literal `/api/v1` appears only there.
@@ -8,7 +8,7 @@ How every endpoint of the Api host behaves. Decisions come from [ADR-006](../adr
 - Give every endpoint an operation name (`.WithName("<Verb><Entity>")`) and the module tag (`.WithTags("<Module>")`); both appear in the OpenAPI document.
 
 ## Errors: RFC 9457 problem details
-Every non-success response that the application pipeline produces has the content type `application/problem+json`, whatever the request's `Accept` header says (also `text/html` or `text/plain`), and the same shape (requests the server rejects before the pipeline runs, for example an oversized request line or malformed HTTP, are answered by the server itself and are not covered):
+Every non-success response that the application pipeline produces has the content type `application/problem+json`, whatever the request's `Accept` header says (also `text/html` or `text/plain`), and the same shape (requests the server rejects before the pipeline runs, for example an oversized request line or malformed HTTP, are answered by the server itself and are not covered). The one deliberate exception is the health endpoints: `/health/ready` answers `503 Unhealthy` as plain text with the status only ([observability.md](observability.md#health)):
 
 ```json
 { "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1", "title": "Bad Request", "status": 400, "traceId": "00-…" }
@@ -27,13 +27,14 @@ Validation failures add `errors`, a map from the command or query property name 
 | Unknown route / method not allowed / wrong content type | 404 / 405 / 415 | framework, same |
 | Unhandled exception | 500 | `ApiExceptionHandler` (host) |
 | Exception after the response started | none: the request is aborted | `ResponseStartedExceptionMiddleware` (host) |
+| Request cancelled by the client | 499, no body (the client is gone) | framework exception handler; `ApiExceptionHandler` is not called |
 
 - All problem responses are written by one host writer, `ProblemJsonWriter`, registered ahead of the framework's default writer (which declines when `Accept` does not allow JSON). It fills `type` and `title` from the framework's RFC 9110 defaults and adds `traceId`. For a status outside the framework's table (for example 429 or 431) `type` is `about:blank` (RFC 9457) and `title` is the HTTP reason phrase, or `Error` when the status has none; so `type` and `title` are present on every problem.
-- `traceId` is present on every path (`Activity.Current.Id`, or the request's trace identifier). Whether a correlation member is added is decided in T-008b.
+- `traceId` is present on every path (`Activity.Current.Id`, or the request's trace identifier); its trace id part is the `TraceId` scope value of the request's log entries. There is no correlation member: every response carries the `X-Correlation-ID` header instead ([observability.md](observability.md#correlation-id)).
 - An exception after the response has started cannot become problem details (the status line is already sent). The request is aborted, so the client sees a broken response rather than a truncated one that looks complete (`UnhandledExceptionTests` observes the abort on the server); logging follows the rule below.
 - Problem details never contain stack traces, exception messages or internal type names; `detail` and `instance` are not set.
 - `RouteHandlerOptions.ThrowOnBadRequest` is `false` in every environment, so bad requests are 400/415, never 500.
-- Logging of unhandled exceptions (before or after the response started): one Error entry with the exception type and the route template only (never the exception message, the query string or the body); the full exception at Debug only (same rule as T-007b). In the cases `UnhandledExceptionTests` covers (an exception before the response started, with each `Accept` value of the 4xx tests, and an exception after the response started), the framework's exception middleware and the server do not log the exception themselves, because the host handles it; the tests check every log category. Other cases are not covered yet: failures while writing the response and client aborts are T-008b.
+- Logging of unhandled exceptions (before or after the response started): one Error entry with the exception type and the route template only (never the exception message, the query string or the body); the full exception at Debug only (same rule as T-007b). In the cases `UnhandledExceptionTests` covers (an exception before the response started, with each `Accept` value of the 4xx tests, and an exception after the response started), the framework's exception middleware and the server do not log the exception themselves, because the host handles it; the tests check every log category. The rule is enforced for every category by the host's log policy (no Warning+ entry carries an exception object; [observability.md](observability.md#logs)). A request cancelled by the client is not an error: one Debug entry and the `api.requests.client_aborted` counter. An exception after the response started also sets the request span to `Error` with an `error.type` tag (no message) and is counted (`api.responses.failed_after_start`). A cancellation the client did not cause is a 500 like any unhandled exception.
 - Problem-details and exception code lives in the Api host only (`src/Hosts/TalepPazari.Api/ErrorHandling/`). Modules return results; they never build problem details by hand except `TypedResults.ValidationProblem`.
 
 ## Validation messages

@@ -119,6 +119,23 @@ public sealed class DatabaseObservabilityTests(PostgresFixture postgres) : IClas
         LogAssert.NoExceptionAtWarningOrAbove(api.Logs.Entries);
     }
 
+    [Fact]
+    public async Task Readiness_is_200_Healthy_when_the_database_runs()
+    {
+        var (api, _) = await CreateApiAsync();
+        await using var __ = api;
+
+        // Only the probe's entries: the migration in the setup logs EF Core's expected history-table error.
+        var setupEntries = api.Logs.Entries.Count;
+        using var response = await api.Client.GetAsync("/health/ready", TestContext.Current.CancellationToken);
+
+        Assert.Equal(200, (int)response.StatusCode);
+        Assert.Equal("Healthy", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Empty(api.Logs.Entries.Skip(setupEntries)
+            .Where(entry => entry.Level >= LogLevel.Warning)
+            .Select(entry => $"{entry.Category}: {entry.Message}"));
+    }
+
     private async Task<(TestApi Api, string ConnectionString)> CreateApiAsync(
         IReadOnlyDictionary<string, string?>? settings = null, bool includeErrorDetail = false)
     {

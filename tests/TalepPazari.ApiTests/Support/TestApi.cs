@@ -27,10 +27,12 @@ public sealed class TestApi : IAsyncDisposable
             builder.UseEnvironment("Testing");
 
             // Added last, so it wins over environment variables of the machine.
-            var values = new Dictionary<string, string?>(settings ?? new Dictionary<string, string?>())
-            {
-                ["ConnectionStrings:Default"] = connectionString,
-            };
+            // settings may override the connection string (a null value removes it).
+            var values = new Dictionary<string, string?>(settings ?? new Dictionary<string, string?>());
+            values.TryAdd("ConnectionStrings:Default", connectionString);
+
+            // Telemetry is collected but not exported, unless a test sets the key (null means "unset").
+            values.TryAdd("Telemetry:Exporter", "None");
             builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(values));
 
             // Every entry of every category at every level, whatever appsettings.json filters.

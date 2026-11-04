@@ -53,7 +53,7 @@ src/Modules/<Name>/
   - Contracts: none
   - Domain: none
   - Application → Domain, Contracts, `src/Shared/TalepPazari.SharedKernel` (unit of work, outbox and handler interfaces); packages `FluentValidation`, `Microsoft.Extensions.DependencyInjection.Abstractions`
-  - Infrastructure → Application; packages `Microsoft.EntityFrameworkCore.Relational`, `Npgsql.EntityFrameworkCore.PostgreSQL`
+  - Infrastructure → Application; packages `Microsoft.EntityFrameworkCore.Relational`, `Npgsql.EntityFrameworkCore.PostgreSQL`, `Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions` (readiness check)
   - Api → Application; `<FrameworkReference Include="Microsoft.AspNetCore.App" />`
   - Another module's project: **only** its `Contracts` project.
 - [ ] Add the five projects to `TalepPazari.slnx` under a `/Modules/<Name>/` folder.
@@ -87,6 +87,8 @@ src/Modules/<Name>/
   ```
 
 - [ ] Table and column names use default EF Core naming for now; in `psql` they need double quotes (`<schema>."Items"`).
+- [ ] Never call `EnableSensitiveDataLogging` or `EnableDetailedErrors` (a test checks every `DbContext` in both hosts).
+- [ ] **Readiness check** (copy `Health/ExampleDatabaseHealthCheck.cs`): an `internal` `IHealthCheck` for the module's own critical dependency (its database), registered in `Add<Name>Module` as a `HealthCheckRegistration` singleton with a 3 s timeout (package `Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions`; the Api runs every registration on `/health/ready`). It never throws: resolve the `DbContext` inside `try` (building its options throws when the connection string is missing), return Unhealthy with a fixed description and no exception object, log the exception at Debug and only state changes at Warning/Information. See [observability.md](../architecture/observability.md#health).
 
 ## 5. Api
 Conventions: [`docs/architecture/api-conventions.md`](../architecture/api-conventions.md) (routes, problem details, validation messages, pagination, OpenAPI).
@@ -124,7 +126,7 @@ Integration events use a per-module outbox and inbox (ADR-003). The Worker host'
 - [ ] **Integration events** this module publishes: `Contracts/IntegrationEvents/<Event>V1.cs`, a `public sealed record` named `<Name>V<N>` (enforced by the architecture tests). The outbox stores the event under its full type name, so renaming or moving a published event breaks messages that are still pending: add a new version instead.
 - [ ] **Outbox and inbox tables** in the module schema (copy `Messaging/OutboxEntry*` and `Messaging/InboxEntry*` from Example, then `dotnet ef migrations add`): `<schema>."OutboxMessages"` with the partial index on `NextAttemptAt`, and `<schema>."InboxMessages"` keyed by (MessageId, HandlerName).
 - [ ] **Infrastructure pieces**, all `internal`, registered in `Add<Name>Module` (copy from `ExampleModule`):
-  - `<Name>UnitOfWork : IUnitOfWork` and `<Name>Outbox : IOutbox`, keyed with `<Name>ApplicationRegistration.ServiceKey`.
+  - `<Name>UnitOfWork : IUnitOfWork` and `<Name>Outbox : IOutbox`, keyed with `<Name>ApplicationRegistration.ServiceKey`. The outbox writes the correlation ID from an **optional** `ICorrelationContext` (constructor parameter `ICorrelationContext? correlationContext = null`, value `correlationContext?.CorrelationId`), so the Api request's ID, or in the Worker the handled message's ID, travels with the event ([observability.md](../architecture/observability.md#correlation-id)).
   - `<Name>IntegrationEventTypes : IIntegrationEventTypes` listing every event the module publishes (singleton). The outbox refuses unlisted types; the dispatcher dead-letters stored names no registry knows.
   - `<Name>OutboxStore : IOutboxStore` (scoped). Every time value is a parameter from the dispatcher's `TimeProvider`; never use the database `now()`. Every `Mark*` statement must require the claim token **and** `"ProcessedAt" IS NULL AND "DeadLetteredAt" IS NULL`, so a finished row is never changed again (see `ExampleOutboxStore`).
   - `InboxIntegrationEventHandler<TEvent>`: every `IIntegrationEventHandler<T>` the module consumes is registered **only** through it (`AddInboxHandler<TEvent, THandler>`). The inbox key is the handler's full type name including namespace, so renaming a handler class makes already-handled messages look new. The decorator refuses a message without an id (an unset event context), and its insert names the key: `ON CONFLICT ("MessageId", "HandlerName") DO NOTHING`.
@@ -140,6 +142,7 @@ Integration events use a per-module outbox and inbox (ADR-003). The Worker host'
 - [ ] `dotnet build TalepPazari.slnx`: zero warnings.
 - [ ] `dotnet run --project src/Hosts/TalepPazari.Api`, then call the endpoint with `curl.exe`. If your environment uses an HTTP proxy, add `--noproxy localhost` to `curl.exe`.
 - [ ] With the database stopped (`docker compose stop`), `dotnet run --project src/Hosts/TalepPazari.Worker` still logs `Worker started`, then logs failed outbox passes and backs off without stopping.
+- [ ] With the database stopped, the Api answers `/health/live` with `200 Healthy` and `/health/ready` with `503 Unhealthy`; after `docker compose start`, `/health/ready` is `200 Healthy`.
 - [ ] Integration tests for the module's outbox and handlers go in `tests/TalepPazari.IntegrationTests` (see AGENTS.md "Commands").
 - [ ] HTTP tests (status codes, problem details, pagination) go in `tests/TalepPazari.ApiTests`, which starts the real Api host in memory (`TestApi`). Tests that need PostgreSQL use `IClassFixture<PostgresFixture>`; all others must run without Docker.
 - [ ] Update `CONTEXT.md` and the generated maps if present.
