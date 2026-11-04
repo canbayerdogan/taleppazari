@@ -1,3 +1,5 @@
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 using TalepPazari.Modules.Example.Infrastructure;
 using TalepPazari.Worker.Observability;
 using TalepPazari.Worker.Outbox;
@@ -19,6 +21,12 @@ public static class WorkerComposition
 
         builder.Services.AddOutboxDispatcher(builder.Configuration);
         builder.Services.AddHostedService<WorkerService>();
+
+        // Traces and metrics (docs/architecture/observability.md): the outbox source and meter, and Npgsql's meter.
+        builder.Services.AddTelemetry(
+            "TalepPazari.Worker",
+            tracing => tracing.AddSource(OutboxTelemetry.Name),
+            metrics => metrics.AddMeter(OutboxTelemetry.Name, "Npgsql"));
 
         // Last: the log policy wraps the logger factory (docs/architecture/observability.md). No HTTP surface,
         // so no category floor; the Warning+ exception rule applies to every category.

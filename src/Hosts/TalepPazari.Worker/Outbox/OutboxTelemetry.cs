@@ -3,7 +3,7 @@ using System.Diagnostics.Metrics;
 
 namespace TalepPazari.Worker.Outbox;
 
-// BCL hooks only; exporters and final names belong to T-008.
+// BCL hooks; the Worker's OpenTelemetry setup (WorkerComposition) subscribes to this source and meter.
 internal static class OutboxTelemetry
 {
     public const string Name = "TalepPazari.Outbox";

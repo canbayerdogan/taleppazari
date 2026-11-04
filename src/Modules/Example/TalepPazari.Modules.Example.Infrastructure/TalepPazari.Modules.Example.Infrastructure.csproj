@@ -9,6 +9,8 @@
          (the Npgsql provider only sets a lower bound). -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <!-- IHealthCheck and HealthCheckRegistration only; the Api host runs the checks (readiness). -->
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" />
   </ItemGroup>
 
 </Project>

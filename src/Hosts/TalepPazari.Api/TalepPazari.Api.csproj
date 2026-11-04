@@ -15,6 +15,10 @@
     <!-- Validation message language is fixed by the host (see Program.cs). -->
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <!-- Traces and metrics (ADR-007); exporter chosen by Telemetry:Exporter (docs/architecture/observability.md). -->
+    <PackageReference Include="OpenTelemetry.Exporter.Console" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
   </ItemGroup>
 
   <ItemGroup>

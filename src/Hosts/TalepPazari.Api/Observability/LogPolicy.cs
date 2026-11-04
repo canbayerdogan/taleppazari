@@ -12,11 +12,14 @@ namespace TalepPazari.Api.Observability;
 //      and the exception type is written at the original level.
 //   2. Categories listed as floors are never enabled below Warning (the Api floors Microsoft.AspNetCore,
 //      whose Information and Debug entries print the URL with its query string and bound parameter values).
+//   3. Categories listed as Debug-only are written at Debug at most (the Api lists the health check service,
+//      which writes an Error entry for every failing probe; module checks log state changes themselves).
 // It wraps the host's ILoggerFactory, so it applies to every provider, including those added later.
 // One copy per host, kept identical except for the namespace (docs/architecture/observability.md).
 internal static class LogPolicy
 {
-    public static IServiceCollection AddLogPolicy(this IServiceCollection services, params string[] warningFloorCategories)
+    public static IServiceCollection AddLogPolicy(
+        this IServiceCollection services, string[]? warningFloorCategories = null, string[]? debugOnlyCategories = null)
     {
         services.Replace(ServiceDescriptor.Singleton<ILoggerFactory>(provider => new PolicyLoggerFactory(
             new LoggerFactory(
@@ -24,7 +27,8 @@ internal static class LogPolicy
                 provider.GetRequiredService<IOptionsMonitor<LoggerFilterOptions>>(),
                 provider.GetService<IOptions<LoggerFactoryOptions>>(),
                 provider.GetService<IExternalScopeProvider>()),
-            warningFloorCategories)));
+            warningFloorCategories ?? [],
+            debugOnlyCategories ?? [])));
         return services;
     }
 
@@ -32,12 +36,14 @@ internal static class LogPolicy
         category.StartsWith(prefix, StringComparison.Ordinal)
         && (category.Length == prefix.Length || category[prefix.Length] == '.');
 
-    private sealed class PolicyLoggerFactory(LoggerFactory inner, string[] warningFloorCategories) : ILoggerFactory
+    private sealed class PolicyLoggerFactory(LoggerFactory inner, string[] warningFloorCategories, string[] debugOnlyCategories)
+        : ILoggerFactory
     {
         public ILogger CreateLogger(string categoryName)
         {
             var minimum = warningFloorCategories.Any(prefix => IsUnder(categoryName, prefix)) ? LogLevel.Warning : LogLevel.Trace;
-            return new PolicyLogger(inner.CreateLogger(categoryName), minimum);
+            var maximum = debugOnlyCategories.Any(prefix => IsUnder(categoryName, prefix)) ? LogLevel.Debug : LogLevel.Critical;
+            return new PolicyLogger(inner.CreateLogger(categoryName), minimum, maximum);
         }
 
         public void AddProvider(ILoggerProvider provider) => inner.AddProvider(provider);
@@ -45,22 +51,29 @@ internal static class LogPolicy
         public void Dispose() => inner.Dispose();
     }
 
-    private sealed class PolicyLogger(ILogger inner, LogLevel minimum) : ILogger
+    private sealed class PolicyLogger(ILogger inner, LogLevel minimum, LogLevel maximum) : ILogger
     {
         public IDisposable? BeginScope<TState>(TState state)
             where TState : notnull => inner.BeginScope(state);
 
-        public bool IsEnabled(LogLevel logLevel) => logLevel >= minimum && inner.IsEnabled(logLevel);
+        public bool IsEnabled(LogLevel logLevel) =>
+            logLevel != LogLevel.None && Capped(logLevel) >= minimum && inner.IsEnabled(Capped(logLevel));
 
         public void Log<TState>(
             LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
         {
+            if (logLevel == LogLevel.None)
+            {
+                return;
+            }
+
+            logLevel = Capped(logLevel);
             if (logLevel < minimum)
             {
                 return;
             }
 
-            if (exception is null || logLevel < LogLevel.Warning || logLevel == LogLevel.None)
+            if (exception is null || logLevel < LogLevel.Warning)
             {
                 inner.Log(logLevel, eventId, state, exception, formatter);
                 return;
@@ -75,6 +88,8 @@ internal static class LogPolicy
 
             inner.Log(logLevel, eventId, new StrippedEntry(eventId, exception.GetType().FullName), null, StrippedEntry.Format);
         }
+
+        private LogLevel Capped(LogLevel logLevel) => logLevel > maximum ? maximum : logLevel;
     }
 
     // Structured state of the Warning+ entry that replaces one carrying an exception.

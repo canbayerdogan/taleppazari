@@ -31,6 +31,9 @@ public sealed class TestApi : IAsyncDisposable
             {
                 ["ConnectionStrings:Default"] = connectionString,
             };
+
+            // Telemetry is collected but not exported, unless a test sets the key (null means "unset").
+            values.TryAdd("Telemetry:Exporter", "None");
             builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(values));
 
             // Every entry of every category at every level, whatever appsettings.json filters.
