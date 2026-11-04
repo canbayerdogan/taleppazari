@@ -10,7 +10,10 @@ These are GitHub settings an agent cannot do for you. Tick them once.
 
 ## Protection (Settings > Rules / Branches)
 - [ ] Require a pull request before merging to `main`
-- [ ] Require status checks to pass (add the check names from T-009 once CI exists)
+- - [x] Require status checks to pass:
+  - `CI result`
+  - `Analyze (csharp)`
+  - Require branches to be up to date before merging
 - [ ] Block force pushes and branch deletion on `main`
 - [ ] Squash merge only; automatically delete head branches after merge
 
