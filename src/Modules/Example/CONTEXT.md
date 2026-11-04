@@ -19,10 +19,11 @@ Show, with the smallest possible code, how a module is laid out, registered, per
 - Integration events published (name, version): `ExampleItemCreatedV1`, through the outbox, in the same transaction as the item
 - Integration events consumed (name, from module): `ExampleItemCreatedV1` from Example itself (demo only: `RecordExampleItemCreatedReceiptHandler`)
 - HTTP endpoints (route prefix): `/example` under the host's `/api/v1` group: `POST /api/v1/example/items`, `GET /api/v1/example/items` (cursor pagination, reference implementation of `docs/architecture/api-conventions.md`)
+- Readiness check: `example-database` (`Health/ExampleDatabaseHealthCheck`, internal), registered in `AddExampleModule` as a `HealthCheckRegistration` (3 s timeout); the Api runs it on `/health/ready`
 
 ## Allowed dependencies
 - Modules (Contracts only): none
-- External: EF Core with the Npgsql provider (Infrastructure), FluentValidation (Application), ASP.NET Core (Api project only)
+- External: EF Core with the Npgsql provider and `Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions` (Infrastructure), FluentValidation (Application), ASP.NET Core (Api project only)
 
 ## Data
 - Schema name: `example`
@@ -40,6 +41,8 @@ Show, with the smallest possible code, how a module is laid out, registered, per
 ## Key flows
 - Create item: `CreateExampleItemRequest` → endpoint maps it to `CreateExampleItemCommand` → `CreateExampleItemHandler` (validate, create entity, stage it, stage `ExampleItemCreatedV1` in the outbox, commit both with one `SaveChanges`) → endpoint maps the result to `ExampleItemResponse` → 201, or 400 `ValidationProblem`.
 - List items: `?limit=&cursor=` → `ListExampleItemsQuery` → `ListExampleItemsHandler` (validate, decode the cursor with `ExampleItemCursor`, ask `IExampleItemQueries` for `limit + 1` rows after the last Id, encode `nextCursor` when the extra row exists) → `ExampleItemPageResponse` → 200, or 400 `ValidationProblem`. The query is `ExampleItemQueries` (Infrastructure, `AsNoTracking`, `"Id" > last ORDER BY "Id"`).
+- Correlation: `ExampleOutbox` writes `CorrelationId` from the optional `ICorrelationContext` of the current scope (the Api request, or in the Worker the handled message), else null. See `docs/architecture/observability.md`.
+- Readiness: `ExampleDatabaseHealthCheck` resolves `ExampleDbContext` inside `try` and calls `CanConnectAsync`; any failure is Unhealthy with a fixed description and no exception (exception at Debug). Only state changes are logged (Warning when unreachable, Information when back).
 - Deliver the event (Worker host): the outbox dispatcher claims the row through `ExampleOutboxStore` → `InboxIntegrationEventHandler<ExampleItemCreatedV1>` inserts the inbox row, runs `RecordExampleItemCreatedReceiptHandler` and commits both → the dispatcher marks the row processed. On failure it retries with back-off and dead-letters at `Outbox:MaxAttempts`. `LastError` holds only the exception type name; Warning/Error logs carry the type and message id, and the full exception is logged at Debug only (an exception message may contain data).
 
 ## Known limits
@@ -47,7 +50,7 @@ Show, with the smallest possible code, how a module is laid out, registered, per
 - A shutdown or a failed result write in the middle of a batch leaves the remaining claimed messages with their incremented `Attempts` and their lease until it expires. Frequent interruptions can therefore dead-letter a healthy message. Accepted for now; to revisit with the deployment target.
 
 ## Related ADRs and tasks
-- ADR-002, ADR-003, ADR-004, ADR-006; T-005 (this module), T-006 (architecture tests), T-007 (outbox), T-008a (API conventions)
+- ADR-002, ADR-003, ADR-004, ADR-006, ADR-007; T-005 (this module), T-006 (architecture tests), T-007 (outbox), T-008a (API conventions), T-008b (correlation, health)
 
 ## Gotchas for agents
 - Example-level choices, not architecture decisions: domain invariants throw `ArgumentException`, and `CreateExampleItemResult` is a module-local result type. A shared Result and error model are decided when a second module needs them.
@@ -66,3 +69,4 @@ Show, with the smallest possible code, how a module is laid out, registered, per
 - Verified against main at 3e8a598 (T-005 branch point), 2026-10-26
 - Outbox/inbox sections verified on the T-007 branch (based on c632934), 2026-11-02
 - HTTP sections verified on the T-008a branch (based on 84558cc), 2026-11-03
+- Correlation and readiness sections verified on the T-008b branch (based on a55455b), 2026-11-04

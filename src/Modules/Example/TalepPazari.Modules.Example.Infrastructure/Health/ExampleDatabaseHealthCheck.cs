@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using TalepPazari.Modules.Example.Infrastructure.Persistence;
@@ -9,10 +10,11 @@ namespace TalepPazari.Modules.Example.Infrastructure.Health;
 // Never throws: every failure (unreachable, wrong password, missing connection string, timeout) is
 // Unhealthy with a fixed description and no exception object, so neither the response nor the health
 // check service's log can carry a connection string or an exception message. The full exception is
-// logged at Debug. State changes (reachable <-> unreachable) are logged once each, so repeated probes
+// logged at Debug. The DbContext is resolved inside the try, because building its options throws when the
+// connection string is missing (that would otherwise escape the check). State changes (reachable <-> unreachable) are logged once each, so repeated probes
 // against a down database do not repeat Warning entries.
 internal sealed partial class ExampleDatabaseHealthCheck(
-    ExampleDbContext dbContext, ExampleReadinessState state, ILogger<ExampleDatabaseHealthCheck> logger) : IHealthCheck
+    IServiceProvider services, ExampleReadinessState state, ILogger<ExampleDatabaseHealthCheck> logger) : IHealthCheck
 {
     public const string Name = "example-database";
     public const string UnhealthyDescription = "The Example database is not reachable.";
@@ -23,6 +25,7 @@ internal sealed partial class ExampleDatabaseHealthCheck(
         bool reachable;
         try
         {
+            var dbContext = services.GetRequiredService<ExampleDbContext>();
             reachable = await dbContext.Database.CanConnectAsync(cancellationToken);
         }
         catch (Exception exception)

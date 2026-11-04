@@ -54,7 +54,9 @@ Run from the repository root. Requires the .NET SDK pinned in `global.json` (10.
 - Restore: `dotnet restore TalepPazari.slnx`
 - Build: `dotnet build TalepPazari.slnx` (warnings are errors; the build must stay at zero warnings)
 - Run Api: `dotnet run --project src/Hosts/TalepPazari.Api` (listens on `http://localhost:5080`, set in `Properties/launchSettings.json`)
-- Liveness check: `curl -i http://localhost:5080/health/live` (expects `200 Healthy`; placeholder until T-008b)
+- Liveness check: `curl -i http://localhost:5080/health/live` (expects `200 Healthy`; process only, also with the database down)
+- Readiness check: `curl -i http://localhost:5080/health/ready` (`200 Healthy`, or `503 Unhealthy` as plain text when a module's critical dependency such as the database is unreachable)
+- Telemetry exporter (both hosts): `Telemetry:Exporter` = `Console` (default) or `None`, for example `$env:Telemetry__Exporter = 'None'` (PowerShell) before `dotnet run`. Logs are JSON on the console; the log policy is in code (`docs/architecture/observability.md`)
 - OpenAPI document (Development only): `curl http://localhost:5080/openapi/v1.json`
 - Run Worker: `dotnet run --project src/Hosts/TalepPazari.Worker` (logs `Worker started`, then runs the outbox dispatcher; settings in the `Outbox` section of its `appsettings.json`; Ctrl+C to stop)
 - Test: `dotnet test TalepPazari.slnx` (builds every project under `src/` first; architecture tests need no database, Docker or network)
@@ -102,4 +104,5 @@ Connection string and migrations (details in `docs/module-template/how-to-add-a-
 - `src/Shared/TalepPazari.SharedKernel/Messaging/`: outbox, inbox and unit-of-work abstractions; `src/Hosts/TalepPazari.Worker/Outbox/`: the dispatcher
 - `tests/TalepPazari.IntegrationTests/`: PostgreSQL integration tests (Testcontainers)
 - `docs/architecture/api-conventions.md`: routes and versioning, problem details, validation messages, cursor pagination, OpenAPI snapshot
+- `docs/architecture/observability.md`: log format and log policy, correlation ID, traces and metrics, health endpoints and module health checks
 - `tests/TalepPazari.ApiTests/`: HTTP tests against the in-memory Api host, including the OpenAPI snapshot
