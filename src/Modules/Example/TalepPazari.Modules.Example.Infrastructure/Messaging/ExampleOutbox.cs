@@ -2,11 +2,17 @@ using System.Diagnostics;
 using System.Text.Json;
 using TalepPazari.Modules.Example.Infrastructure.Persistence;
 using TalepPazari.SharedKernel.Messaging;
+using TalepPazari.SharedKernel.Observability;
 
 namespace TalepPazari.Modules.Example.Infrastructure.Messaging;
 
-internal sealed class ExampleOutbox(ExampleDbContext dbContext, ExampleIntegrationEventTypes eventTypes, TimeProvider timeProvider)
-    : IOutbox
+// The correlation context is optional: a composition without a host implementation (for example a test or a
+// tool that composes only this module) writes CorrelationId as null.
+internal sealed class ExampleOutbox(
+    ExampleDbContext dbContext,
+    ExampleIntegrationEventTypes eventTypes,
+    TimeProvider timeProvider,
+    ICorrelationContext? correlationContext = null) : IOutbox
 {
     // The dispatcher deserializes with the same defaults (System.Text.Json web defaults).
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
@@ -30,9 +36,9 @@ internal sealed class ExampleOutbox(ExampleDbContext dbContext, ExampleIntegrati
             OccurredAt = now,
             NextAttemptAt = now,
 
-            // Propagated only. Correlation ID generation and validation belong to T-008.
+            // Propagated only: the host validates or generates the correlation ID (ADR-007).
             TraceParent = Activity.Current?.Id,
-            CorrelationId = null,
+            CorrelationId = correlationContext?.CorrelationId,
         });
     }
 }

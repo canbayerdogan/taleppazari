@@ -1,9 +1,12 @@
 using TalepPazari.SharedKernel.Messaging;
+using TalepPazari.SharedKernel.Observability;
 
 namespace TalepPazari.Worker.Outbox;
 
 // Scoped: the dispatcher sets it in each handler's scope before resolving the handler.
-internal sealed class IntegrationEventContext : IIntegrationEventContext
+// It is also the scope's ICorrelationContext: the message's correlation ID is restored for the handler,
+// so events the handler publishes carry it. Outside a handler scope it is unset (null).
+internal sealed class IntegrationEventContext : IIntegrationEventContext, ICorrelationContext
 {
     public Guid MessageId { get; private set; }
 
