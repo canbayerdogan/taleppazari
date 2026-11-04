@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using TalepPazari.SharedKernel.Messaging;
+using TalepPazari.SharedKernel.Observability;
 
 namespace TalepPazari.Worker.Outbox;
 
@@ -25,6 +26,7 @@ public static class OutboxDispatcherRegistration
 
         services.AddScoped<IntegrationEventContext>();
         services.AddScoped<IIntegrationEventContext>(provider => provider.GetRequiredService<IntegrationEventContext>());
+        services.AddScoped<ICorrelationContext>(provider => provider.GetRequiredService<IntegrationEventContext>());
         services.AddSingleton<OutboxDispatcher>();
         return services;
     }

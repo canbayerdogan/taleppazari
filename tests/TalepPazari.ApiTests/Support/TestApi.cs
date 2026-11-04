@@ -19,7 +19,7 @@ public sealed class TestApi : IAsyncDisposable
     private readonly WebApplicationFactory<Program> root;
     private readonly WebApplicationFactory<Program> factory;
 
-    private TestApi(string connectionString, Action<IServiceCollection>? configureServices)
+    private TestApi(string connectionString, Action<IServiceCollection>? configureServices, IReadOnlyDictionary<string, string?>? settings)
     {
         root = new WebApplicationFactory<Program>();
         factory = root.WithWebHostBuilder(builder =>
@@ -27,8 +27,11 @@ public sealed class TestApi : IAsyncDisposable
             builder.UseEnvironment("Testing");
 
             // Added last, so it wins over environment variables of the machine.
-            builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
-                new Dictionary<string, string?> { ["ConnectionStrings:Default"] = connectionString }));
+            var values = new Dictionary<string, string?>(settings ?? new Dictionary<string, string?>())
+            {
+                ["ConnectionStrings:Default"] = connectionString,
+            };
+            builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(values));
 
             // Every entry of every category at every level, whatever appsettings.json filters.
             builder.ConfigureLogging(logging => logging
@@ -49,8 +52,12 @@ public sealed class TestApi : IAsyncDisposable
 
     public IServiceProvider Services => factory.Services;
 
-    public static TestApi Create(string? connectionString = null, Action<IServiceCollection>? configureServices = null) =>
-        new(connectionString ?? PlaceholderConnectionString, configureServices);
+    // settings: extra configuration values (for example Logging:LogLevel entries), added after appsettings.json.
+    public static TestApi Create(
+        string? connectionString = null,
+        Action<IServiceCollection>? configureServices = null,
+        IReadOnlyDictionary<string, string?>? settings = null) =>
+        new(connectionString ?? PlaceholderConnectionString, configureServices, settings);
 
     public async ValueTask DisposeAsync()
     {
