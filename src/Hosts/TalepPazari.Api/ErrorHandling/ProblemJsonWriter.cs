@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Http.Json;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 
 namespace TalepPazari.Api.ErrorHandling;
@@ -12,6 +13,7 @@ namespace TalepPazari.Api.ErrorHandling;
 internal sealed class ProblemJsonWriter(IOptions<JsonOptions> jsonOptions) : IProblemDetailsWriter
 {
     private const string ContentType = "application/problem+json";
+    private const string AboutBlank = "about:blank";
 
     public bool CanWrite(ProblemDetailsContext context) => true;
 
@@ -21,14 +23,20 @@ internal sealed class ProblemJsonWriter(IOptions<JsonOptions> jsonOptions) : IPr
         var problem = context.ProblemDetails;
 
         // Same defaults as the framework: status from the response, RFC 9110 type and title, traceId.
+        // For a status outside the framework's table (for example 429) the framework sets no type: use
+        // "about:blank" (RFC 9457 section 4.2.1). Its title is then the HTTP reason phrase; a status without
+        // one (for example 599) gets a fixed title, so title is never empty.
         problem.Status ??= httpContext.Response.StatusCode;
         var defaults = TypedResults.Problem(statusCode: problem.Status).ProblemDetails;
-        problem.Type ??= defaults.Type;
-        problem.Title ??= defaults.Title;
+        problem.Type ??= defaults.Type ?? AboutBlank;
+        problem.Title ??= string.IsNullOrEmpty(defaults.Title) ? FallbackTitle(problem.Status.Value) : defaults.Title;
         problem.Extensions.TryAdd("traceId", Activity.Current?.Id ?? httpContext.TraceIdentifier);
 
         // Runtime type, so HttpValidationProblemDetails keeps its "errors" member.
         return new ValueTask(httpContext.Response.WriteAsJsonAsync(
             problem, problem.GetType(), jsonOptions.Value.SerializerOptions, ContentType, httpContext.RequestAborted));
     }
+
+    private static string FallbackTitle(int status) =>
+        ReasonPhrases.GetReasonPhrase(status) is { Length: > 0 } reasonPhrase ? reasonPhrase : "Error";
 }

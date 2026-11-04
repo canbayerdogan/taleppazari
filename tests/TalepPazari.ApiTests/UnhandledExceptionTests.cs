@@ -20,9 +20,10 @@ public sealed class UnhandledExceptionTests
     private const string RouteTemplate = "/api/v1/example/items";
     private const string StartedThenThrowsPath = "/test-only/started-then-throws";
 
-    public const string NoAccept = "(none)";
+    private const string NoAccept = ProblemDetailsTests.NoAccept;
 
-    public static TheoryData<string> AcceptHeaders => new() { NoAccept, "text/html" };
+    // The same Accept values as the 4xx tests.
+    public static TheoryData<string> AcceptHeaders => ProblemDetailsTests.AcceptHeaders;
 
     [Theory]
     [MemberData(nameof(AcceptHeaders))]
@@ -73,16 +74,26 @@ public sealed class UnhandledExceptionTests
     [Fact]
     public async Task Exception_after_the_response_started_aborts_the_request_and_logs_type_only()
     {
+        var endpoint = new StartedThenThrowsEndpoint();
         await using var api = TestApi.Create(configureServices: services =>
-            services.AddSingleton<IStartupFilter, StartedThenThrowsEndpoint>());
+            services.AddSingleton<IStartupFilter>(endpoint));
 
         // The status line and part of the body are already sent, so no problem details can follow:
         // the request is aborted and the client sees a broken response.
-        await Assert.ThrowsAnyAsync<Exception>(async () =>
+        var clientError = await Record.ExceptionAsync(async () =>
         {
             using var response = await api.Client.GetAsync(StartedThenThrowsPath, TestContext.Current.CancellationToken);
             await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         });
+
+        // Client side: the response is broken, and not because the in-memory test server passed the server's
+        // exception through. The inner exception kind (IOException or OperationCanceledException) varies
+        // from run to run, so it is not asserted.
+        Assert.NotNull(clientError);
+        Assert.DoesNotContain(ExceptionChain(clientError), exception => exception is LeakyTestException);
+
+        // Server side, the actual proof: RequestAborted fired, so the request was aborted, not completed.
+        await endpoint.Aborted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         var entries = api.Logs.Entries.ToList();
         AssertSecretInNoLogEntry(api.Logs);
@@ -101,6 +112,14 @@ public sealed class UnhandledExceptionTests
         Assert.All(entries, entry => Assert.DoesNotContain(Secret, entry.Message, StringComparison.Ordinal));
         Assert.All(entries.Where(entry => entry.Exception is not null), entry => Assert.True(
             entry.Level <= LogLevel.Debug, $"{entry.Category} logged the exception object at {entry.Level}."));
+    }
+
+    private static IEnumerable<Exception> ExceptionChain(Exception exception)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            yield return current;
+        }
     }
 
     private static async Task<HttpResponseMessage> SendCreateAsync(TestApi api, string accept, string url, string name = "item")
@@ -125,14 +144,17 @@ public sealed class UnhandledExceptionTests
     private sealed class LeakyTestException(string message) : Exception(message);
 
     // Test host only: a terminal branch after the host's own pipeline (so inside its error handling)
-    // that writes and flushes part of a response, then throws.
+    // that writes and flushes part of a response, then throws. Aborted completes when RequestAborted fires.
     private sealed class StartedThenThrowsEndpoint : IStartupFilter
     {
+        public TaskCompletionSource Aborted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
         {
             next(app);
             app.Map(StartedThenThrowsPath, branch => branch.Run(async context =>
             {
+                context.RequestAborted.Register(() => Aborted.TrySetResult());
                 await context.Response.WriteAsync("partial", context.RequestAborted);
                 await context.Response.Body.FlushAsync(context.RequestAborted);
                 throw new LeakyTestException(Secret);

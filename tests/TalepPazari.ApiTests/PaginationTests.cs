@@ -103,7 +103,17 @@ public sealed class PaginationTests(PostgresFixture postgres) : IClassFixture<Po
         var connectionString = await postgres.CreateDatabaseAsync();
         var clock = new ManualTimeProvider();
         var api = TestApi.Create(connectionString, services => services.AddSingleton<TimeProvider>(clock));
-        await ExampleModule.MigrateDatabaseAsync(api.Services, TestContext.Current.CancellationToken);
+        try
+        {
+            await ExampleModule.MigrateDatabaseAsync(api.Services, TestContext.Current.CancellationToken);
+        }
+        catch
+        {
+            // The caller's "await using" never sees the api, so dispose it here.
+            await api.DisposeAsync();
+            throw;
+        }
+
         return api;
     }
 
