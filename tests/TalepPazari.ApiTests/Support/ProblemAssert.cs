@@ -7,7 +7,9 @@ public static class ProblemAssert
 {
     private static readonly string[] BaseMembers = ["status", "title", "traceId", "type"];
 
-    public static async Task<JsonElement> HasShapeAsync(HttpResponseMessage response, int expectedStatus, bool withErrors = false)
+    // expectedType null: an RFC 9110 link from the framework's default table (starts with https://).
+    public static async Task<JsonElement> HasShapeAsync(
+        HttpResponseMessage response, int expectedStatus, bool withErrors = false, string? expectedType = null)
     {
         Assert.Equal(expectedStatus, (int)response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -21,7 +23,15 @@ public static class ProblemAssert
         Assert.Equal(expected.Order(StringComparer.Ordinal), actual);
 
         Assert.Equal(expectedStatus, root.GetProperty("status").GetInt32());
-        Assert.StartsWith("https://", root.GetProperty("type").GetString(), StringComparison.Ordinal);
+        if (expectedType is null)
+        {
+            Assert.StartsWith("https://", root.GetProperty("type").GetString(), StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.Equal(expectedType, root.GetProperty("type").GetString());
+        }
+
         Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("title").GetString()));
         Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("traceId").GetString()));
         return root;

@@ -8,7 +8,7 @@ How every endpoint of the Api host behaves. Decisions come from [ADR-006](../adr
 - Give every endpoint an operation name (`.WithName("<Verb><Entity>")`) and the module tag (`.WithTags("<Module>")`); both appear in the OpenAPI document.
 
 ## Errors: RFC 9457 problem details
-Every non-success response has the content type `application/problem+json`, whatever the request's `Accept` header says (also `text/html` or `text/plain`), and the same shape:
+Every non-success response that the application pipeline produces has the content type `application/problem+json`, whatever the request's `Accept` header says (also `text/html` or `text/plain`), and the same shape (requests the server rejects before the pipeline runs, for example an oversized request line or malformed HTTP, are answered by the server itself and are not covered):
 
 ```json
 { "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1", "title": "Bad Request", "status": 400, "traceId": "00-…" }
@@ -28,12 +28,12 @@ Validation failures add `errors`, a map from the command or query property name 
 | Unhandled exception | 500 | `ApiExceptionHandler` (host) |
 | Exception after the response started | none: the request is aborted | `ResponseStartedExceptionMiddleware` (host) |
 
-- All problem responses are written by one host writer, `ProblemJsonWriter`, registered ahead of the framework's default writer (which declines when `Accept` does not allow JSON). It fills `type` and `title` from the framework's RFC 9110 defaults and adds `traceId`.
+- All problem responses are written by one host writer, `ProblemJsonWriter`, registered ahead of the framework's default writer (which declines when `Accept` does not allow JSON). It fills `type` and `title` from the framework's RFC 9110 defaults and adds `traceId`. For a status outside the framework's table (for example 429 or 431) `type` is `about:blank` (RFC 9457) and `title` is the HTTP reason phrase, or `Error` when the status has none; so `type` and `title` are present on every problem.
 - `traceId` is present on every path (`Activity.Current.Id`, or the request's trace identifier). Whether a correlation member is added is decided in T-008b.
-- An exception after the response has started cannot become problem details (the status line is already sent). The request is aborted, so the client sees a broken response rather than a truncated one that looks complete; logging follows the rule below.
+- An exception after the response has started cannot become problem details (the status line is already sent). The request is aborted, so the client sees a broken response rather than a truncated one that looks complete (`UnhandledExceptionTests` observes the abort on the server); logging follows the rule below.
 - Problem details never contain stack traces, exception messages or internal type names; `detail` and `instance` are not set.
 - `RouteHandlerOptions.ThrowOnBadRequest` is `false` in every environment, so bad requests are 400/415, never 500.
-- Logging of unhandled exceptions (before or after the response started): one Error entry with the exception type and the route template only (never the exception message, the query string or the body); the full exception at Debug only (same rule as T-007b). The framework's exception middleware and the server do not log the exception themselves, because the host always handles it; `UnhandledExceptionTests` checks every log category, also with `Accept: text/html`. Client aborts are not handled here (T-008b).
+- Logging of unhandled exceptions (before or after the response started): one Error entry with the exception type and the route template only (never the exception message, the query string or the body); the full exception at Debug only (same rule as T-007b). In the cases `UnhandledExceptionTests` covers (an exception before the response started, with each `Accept` value of the 4xx tests, and an exception after the response started), the framework's exception middleware and the server do not log the exception themselves, because the host handles it; the tests check every log category. Other cases are not covered yet: failures while writing the response and client aborts are T-008b.
 - Problem-details and exception code lives in the Api host only (`src/Hosts/TalepPazari.Api/ErrorHandling/`). Modules return results; they never build problem details by hand except `TypedResults.ValidationProblem`.
 
 ## Validation messages
@@ -48,7 +48,8 @@ GET /api/v1/example/items?limit=20&cursor=<nextCursor>
 ```
 
 - `limit`: optional, default **20**, maximum **100**. Out of range (below 1 or above 100) returns a 400 problem with `errors.Limit`; it is never clamped silently.
-- `cursor`: optional, opaque. Clients pass back `nextCursor` unchanged. Any other value returns a 400 problem with `errors.Cursor`: wrong length, characters outside the base64url alphabet, padding or whitespace, non-zero unused bits, an unknown format version or an empty id. The decoder never throws and accepts only the exact (canonical) string the server produced.
+- `cursor`: optional, opaque. Clients pass back `nextCursor` unchanged. Any other value returns a 400 problem with `errors.Cursor`: wrong length, characters outside the base64url alphabet, padding or whitespace, non-zero unused bits, an unknown format version or an empty id. The decoder never throws and accepts only the exact (canonical) string the server produced. Its final re-encode comparison is an extra defence: with the current .NET base64url decoder it is unreachable for 23-character input, because the decoder already rejects every non-canonical string of that length.
+- An empty cursor (`?cursor=` or a bare `?cursor`) binds as an empty string, not as "no cursor", so it returns the same 400 problem with `errors.Cursor`; omit the parameter to get the first page.
 - Order: ascending `Id` (UUID v7, ADR-004), keyset query `WHERE "Id" > @last ORDER BY "Id" LIMIT limit + 1`; the extra row decides whether `nextCursor` is set. No count query, no offset.
 - Stable under inserts: an item created after a page was served has a larger Id, so it appears on a later page; nothing is returned twice or skipped.
 - Cursor format (internal, may change): base64url without padding (23 characters) of a format-version byte plus the 16-byte Id in big-endian order.
