@@ -1,7 +1,7 @@
 # T-009 — CI pipeline
 
 - **Phase:** 1
-- **Status:** todo
+- **Status:** done
 - **Depends on:** T-003, T-006, T-007, T-008a, T-008a1 (extend after T-008b, T-010)
 - **Approval:** required
 - **Branch:** `task/T-009-ci`
