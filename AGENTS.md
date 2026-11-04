@@ -60,10 +60,23 @@ Run from the repository root. Requires the .NET SDK pinned in `global.json` (10.
 - Test: `dotnet test TalepPazari.slnx` (builds every project under `src/` first; architecture tests need no database, Docker or network)
 - One test class: `dotnet test TalepPazari.slnx --filter "FullyQualifiedName~ModuleReferenceTests"`
 - Integration tests only: `dotnet test tests/TalepPazari.IntegrationTests`. They need Docker: Testcontainers starts a throwaway `postgis/postgis:18-3.6` container (same image as `compose.yaml`) and gives each test its own database, so local data is never touched. Without Docker they are skipped with a message, and the rest of `dotnet test` still runs.
-- Force the integration tests (fail instead of skip when Docker is missing; this is the mode CI will use once T-009 wires it): set `TALEPPAZARI_REQUIRE_DOCKER=true` first (PowerShell `$env:TALEPPAZARI_REQUIRE_DOCKER = 'true'`, bash `TALEPPAZARI_REQUIRE_DOCKER=true dotnet test ...`)
+- Force the integration tests (fail instead of skip when Docker is missing; this is the mode CI uses): set `TALEPPAZARI_REQUIRE_DOCKER=true` first (PowerShell `$env:TALEPPAZARI_REQUIRE_DOCKER = 'true'`, bash `TALEPPAZARI_REQUIRE_DOCKER=true dotnet test ...`)
 - Api tests only: `dotnet test tests/TalepPazari.ApiTests`. They start the real Api host in memory (`WebApplicationFactory`). Pagination tests need Docker (per-class PostgreSQL fixture, same skip/`TALEPPAZARI_REQUIRE_DOCKER` rule); every other Api test runs and passes without Docker.
 - OpenAPI snapshot, deliberate update (local only, refused when `CI=true`): set `TALEPPAZARI_UPDATE_SNAPSHOTS=true`, run `dotnet test tests/TalepPazari.ApiTests --filter "FullyQualifiedName~OpenApiSnapshotTests"`, unset it, review and commit the diff of `tests/TalepPazari.ApiTests/Snapshots/openapi-v1.json`. On a mismatch the test writes `openapi-v1.received.json` to its output directory.
 - Architecture tests (`tests/TalepPazari.ArchitectureTests`) discover modules by the `TalepPazari.Modules.<Name>.<Layer>` convention; a new module needs no test change. A failure message names the rule and the offending project or type.
+
+CI (`.github/workflows/ci.yml`, `.github/workflows/codeql.yml`; Linux runner, Release configuration):
+- Environment CI sets: `CI=true` (GitHub sets it), `TALEPPAZARI_REQUIRE_DOCKER=true`, `TESTCONTAINERS_RYUK_DISABLED=true`. CI never sets `TALEPPAZARI_UPDATE_SNAPSHOTS`.
+- Run the same steps locally, in this order, with Docker running (bash: `export CI=true TALEPPAZARI_REQUIRE_DOCKER=true TESTCONTAINERS_RYUK_DISABLED=true`; PowerShell: set each with `$env:NAME = 'true'`, and clear them afterwards):
+  1. `dotnet restore TalepPazari.slnx`
+  2. `dotnet build TalepPazari.slnx --configuration Release --no-restore`
+  3. `dotnet format TalepPazari.slnx --verify-no-changes --no-restore`
+  4. `docker pull postgis/postgis:18-3.6`
+  5. `dotnet test tests/TalepPazari.ArchitectureTests --configuration Release --no-build`
+  6. `dotnet test tests/TalepPazari.ApiTests --configuration Release --no-build`
+  7. `dotnet test tests/TalepPazari.IntegrationTests --configuration Release --no-build`
+- CI also runs dependency review (pull requests), a Gitleaks secret scan (the PR's commits; full history on `main`) and CodeQL. A weekly scheduled run repeats build and test, so a new NuGet advisory shows up without a PR.
+- Required checks: `CI result` (aggregate of the CI jobs) and `Analyze (csharp)` (CodeQL). Renaming a job renames its check and breaks branch protection.
 
 Local database (PostgreSQL 18 + PostGIS, Docker Compose; details in README "Local development"):
 - First-time setup: `Copy-Item .env.example .env` (PowerShell) or `cp .env.example .env` (bash)

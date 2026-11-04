@@ -4,8 +4,26 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Project rule: no release younger than two weeks. Cooldown applies to version updates only;
+    # Dependabot security updates are not delayed by it.
+    cooldown:
+      default-days: 14
     groups:
       nuget-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Keeps the SHA-pinned actions in .github/workflows up to date (SHA and version comment).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Only default-days is supported for github-actions (no semver-specific days).
+    cooldown:
+      default-days: 14
+    groups:
+      github-actions-minor-patch:
         update-types:
           - "minor"
           - "patch"
