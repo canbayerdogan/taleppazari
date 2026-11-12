@@ -20,6 +20,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Logging.Configure(options => options.ActivityTrackingOptions =
     ActivityTrackingOptions.TraceId | ActivityTrackingOptions.SpanId | ActivityTrackingOptions.ParentId);
 
+// Health (ADR-007): modules register HealthCheckRegistration singletons for their own critical dependencies;
+// /health/ready runs all of them, /health/live none. Responses are the plain-text status only.
 builder.Services.AddHealthChecks();
 builder.Services.AddOptions<HealthCheckServiceOptions>()
     .Configure<IEnumerable<HealthCheckRegistration>>((options, registrations) =>
@@ -29,11 +31,6 @@ builder.Services.AddOptions<HealthCheckServiceOptions>()
             options.Registrations.Add(registration);
         }
     });
-
-// Correlation ID (ADR-007): one CorrelationContext per request, read by modules through ICorrelationContext.
-builder.Services.AddScoped<CorrelationContext>();
-builder.Services.AddScoped<ICorrelationContext>(provider => provider.GetRequiredService<CorrelationContext>());
-builder.Services.AddSingleton<ApiMetrics>();
 
 // Correlation ID (ADR-007): one CorrelationContext per request, read by modules through ICorrelationContext.
 builder.Services.AddScoped<CorrelationContext>();

@@ -18,7 +18,8 @@ namespace TalepPazari.Worker.Observability;
 // One copy per host, kept identical except for the namespace (docs/architecture/observability.md).
 internal static class LogPolicy
 {
-    public static IServiceCollection AddLogPolicy(this IServiceCollection services, params string[] warningFloorCategories)
+    public static IServiceCollection AddLogPolicy(
+        this IServiceCollection services, string[]? warningFloorCategories = null, string[]? debugOnlyCategories = null)
     {
         services.Replace(ServiceDescriptor.Singleton<ILoggerFactory>(provider => new PolicyLoggerFactory(
             new LoggerFactory(
